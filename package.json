@@ -40,7 +40,8 @@
     "pack:omr": "node scripts/pack-omr.mjs",
     "test": "vitest run",
     "test:upstream": "node -e \"require('fs').existsSync('../dev/vitest.config.ts')||(console.error('识别回归用例在同级的本地私有仓库 ../dev（语料有版权，不随公开仓库分发），没有它就没有可跑的测试'),process.exit(1))\" && vitest run --config ../dev/vitest.config.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:browser": "node tests/browser/smoke.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.11.1",
