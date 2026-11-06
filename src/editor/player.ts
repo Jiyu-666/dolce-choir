@@ -1,3 +1,4 @@
+import { TempoClock } from "../score/tempo";
 // In-editor playback. The front-end always owns the play clock and drives the
 // cursor-follow highlight; the audio itself comes from one of two sources:
 //   - SamplerSource: Web Audio + smplr SoundFont (browser & desktop, sampled timbre; the piano ships with the app)
@@ -59,23 +60,24 @@ const LEAD = 0.15;
 const NATIVE_PREROLL = 0.05;
 
 /** 一份谱按给定播放参数的时间线（秒）：锚点与总长。控制器在没开播时也要用它（进度条总长、点音符换算秒数）。 */
-export function timelineSeconds(src: PlaySource, opts?: PlayOptions): { tl: Timeline; spq: number } {
-  return { tl: buildTimeline(src), spq: 60 / playTempo(src, opts) };
+export function timelineSeconds(src: PlaySource, opts?: PlayOptions): { tl: Timeline; clock: TempoClock } {
+  const tl = buildTimeline(src);
+  return { tl, clock: new TempoClock(tl.tempos, playTempo(src, opts) / playTempo(src)) };
 }
 
 /** 锚点里找 `point` 的起音秒数（找不到那一遍取任一遍；旋律里没有再找其它声部）；没有这个音为 null。 */
-export function anchorSeconds(tl: Timeline, spq: number, point: PlayPoint): number | null {
+export function anchorSeconds(tl: Timeline, clock: TempoClock, point: PlayPoint): number | null {
   const a = findAnchor(tl.anchors, point, (x) => x.chord.id) ?? findAnchor(tl.allAnchors, point, (x) => x.chord.id);
-  return a ? a.t0 * spq : null;
+  return a ? clock.secondsAt(a.t0) : null;
 }
 
 /** 一段音（`first` 起音到 `last` 收尾）的秒数区间；找不到为 null。循环段用。 */
-export function spanSeconds(tl: Timeline, spq: number, first: PlayPoint, last: PlayPoint): { from: number; to: number } | null {
+export function spanSeconds(tl: Timeline, clock: TempoClock, first: PlayPoint, last: PlayPoint): { from: number; to: number } | null {
   const a = findAnchor(tl.allAnchors, first, (x) => x.chord.id);
   const b = findAnchor(tl.allAnchors, last, (x) => x.chord.id);
   if (!a || !b) return null;
   const end = b.t0 + (b.chord.duration?.toFloat() ?? 0);
-  return end > a.t0 ? { from: a.t0 * spq, to: end * spq } : null;
+  return end > a.t0 ? { from: clock.secondsAt(a.t0), to: clock.secondsAt(end) } : null;
 }
 
 function findAnchor<A extends { pass: number }>(
@@ -159,24 +161,25 @@ export class ScorePlayer {
   async play(src: PlaySource, opts?: PlayOptions, startSec = 0, paused = false): Promise<void> {
     this.stop();
     const gen = this.gen;
-    const { tl, spq } = timelineSeconds(src, opts);
+    const { tl, clock } = timelineSeconds(src, opts);
     if (tl.notes.length === 0) return;
 
-    const toSec = (a: Timeline["anchors"][number]): Anchor => ({ t: a.t0 * spq, id: a.chord.id, pass: a.pass, occ: a.occ ?? 0 });
+    const toSec = (a: Timeline["anchors"][number]): Anchor => ({ t: clock.secondsAt(a.t0), id: a.chord.id, pass: a.pass, occ: a.occ ?? 0 });
     this.session = {
       // 光标跟各声部起音（各视图的竖直播放线），不只跟旋律
       anchors: onsetAnchors(tl).map(toSec),
       lookup: [...tl.anchors, ...tl.allAnchors].map(toSec),
       notes: tl.notes
+        .filter(n => (opts?.selectedParts?.includes(n.part) ?? true) && partGain(opts,n.part)>0)
         .map((n) => ({
-          t0: n.t0 * spq,
-          t1: n.t1 * spq,
+          t0: clock.secondsAt(n.t0),
+          t1: clock.secondsAt(n.t1),
           pitch: n.pitch,
           velocity: Math.max(1, Math.round(n.velocity * partGain(opts, n.part))),
         }))
         .sort((a, b) => a.t0 - b.t0),
-      duration: tl.duration * spq,
-      clicks: opts?.metronome ? tl.clicks.map((c) => ({ t: c.t * spq, down: c.down })) : [],
+      duration: clock.secondsAt(tl.duration),
+      clicks: opts?.metronome ? tl.clicks.map((c) => ({ t: clock.secondsAt(c.t), down: c.down })) : [],
       src,
       opts,
       midi: null,
