@@ -214,6 +214,7 @@ async function boot() {
   on("btn-next", () => app.nextPage());
   on("btn-options", () => showOptionsDialog(app));
   on("btn-parts", () => showPartsPanel(app));
+  on("btn-choir", () => { void import("./choir/panel").then(m => m.showChoirPanel(app)).catch(() => app.setStatus(t("choir.failed"))); });
   const hanziBtn = document.getElementById("btn-hanzi") as HTMLButtonElement | null;
   if (hanziBtn) {
     app.setHanziButton(hanziBtn);

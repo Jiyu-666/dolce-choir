@@ -1,0 +1,8 @@
+.choir-box { width: min(920px, 96vw); }
+.choir-panel { max-height: 76vh; overflow: auto; padding: 4px 2px; }
+.choir-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.choir-role { border: 1px solid var(--border, #ccc); border-radius: 8px; padding: 12px; margin: 12px 0; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.choir-role h3 { margin: 0; min-width: 70px; }
+.choir-role input:not([type=checkbox]), .choir-role select { max-width: 100%; min-height: 36px; }
+.choir-role > div { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.choir-panel button { min-height: 36px; }
