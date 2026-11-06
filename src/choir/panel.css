@@ -6,3 +6,9 @@
 .choir-role input:not([type=checkbox]), .choir-role select { max-width: 100%; min-height: 36px; }
 .choir-role > div { width: 100%; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .choir-panel button { min-height: 36px; }
+
+.choir-panel fieldset { display: flex; gap: 12px; flex-wrap: wrap; margin: 16px 0; }
+.choir-panel fieldset label { display: flex; align-items: center; gap: 6px; }
+.choir-panel input[type=number] { width: 64px; min-height: 36px; }
+.choir-preview { margin-top: 12px; }
+.choir-preview svg { position: relative; inset: auto; display: block; width: 100%; height: auto; background: white; margin-bottom: 12px; }

@@ -2,6 +2,14 @@
 import type { MsgKey } from "./zh";
 
 export const en: Record<MsgKey, string> = {
+  "choir.layout": "Choir layout (display settings keep voice mapping)",
+  "choir.layout.staffMm": "Staff height (mm)",
+  "choir.layout.jianpuPt": "Jianpu size (pt)",
+  "choir.layout.layerGapMm": "Layer clearance (mm)",
+  "choir.layout.groupGapMm": "Voice group clearance (mm)",
+  "choir.preview": "Preview choir score",
+  "choir.pdf": "Export choir PDF",
+  "choir.png": "Export choir PNG",
   "choir.title": "Choir setup",
   "choir.noScore": "Open a score first",
   "choir.invalidSource": "The current score cannot be prepared. Check the source score.",

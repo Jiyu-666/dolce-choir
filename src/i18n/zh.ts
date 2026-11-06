@@ -1,6 +1,14 @@
 // 界面文案（中文，同时是键的权威清单）。新增文字两边同加：en.ts 漏键 tsc 报错。
 // 占位写 {name}，由 t(key, { name }) 替换。
 export const zh = {
+  "choir.layout": "合唱版式（显示设置不改变声部分配）",
+  "choir.layout.staffMm": "五线谱高度（mm）",
+  "choir.layout.jianpuPt": "简谱字号（pt）",
+  "choir.layout.layerGapMm": "简谱与五线谱净距（mm）",
+  "choir.layout.groupGapMm": "声部组净距（mm）",
+  "choir.preview": "生成四声部混排预览",
+  "choir.pdf": "导出混排 PDF",
+  "choir.png": "导出混排 PNG",
   "choir.title": "合唱设置",
   "choir.noScore": "请先打开乐谱",
   "choir.invalidSource": "当前乐谱尚不能生成合唱谱，请先检查原谱。",

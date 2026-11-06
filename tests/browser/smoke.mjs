@@ -1,8 +1,10 @@
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { verifyChoirLayout } from './choir-layout.mjs';
 import { spawn } from 'node:child_process';
-const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1'], { stdio: 'ignore' });
+const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1'], { stdio: ['ignore','pipe','pipe'] });
+server.stderr.on("data", data => console.error("VITE", String(data).slice(0,2000)));
 let browser;
 try {
   for (let n = 0; ; n++) {
@@ -13,6 +15,8 @@ try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   page.setDefaultTimeout(15000);
+  page.on("pageerror", error => console.error(error));
+  page.on("console", msg => { if (msg.type() === "error") console.error(msg.text()); });
   await page.goto('http://127.0.0.1:1420');
   await page.waitForFunction(() => !!window.__app);
   await page.locator("#btn-start-sample").click();
@@ -33,6 +37,22 @@ try {
   assert.equal(await page.locator('.choir-role').count(), 4);
   for (const role of ['S','A','T','B']) await page.locator(`.choir-role[data-role="${role}"] input[type=checkbox]`).first().check();
   assert.equal(await page.locator('[data-testid="choir-issues"]').count(),0);
+  await page.locator('[data-testid="choir-preview"]').click();
+  await page.locator('.choir-preview svg').first().waitFor();
+  assert.equal(await page.locator('.choir-preview svg text').filter({hasText:/^[SATB]$/}).count(), 4);
+  await page.locator('input[data-layout="jianpuPt"]').fill('18');
+  await page.locator('input[data-layout="jianpuPt"]').press('Tab');
+  assert.equal(await page.locator('.choir-preview svg').count(), 0, 'Old preview survived layout edit');
+  await page.locator('[data-testid="choir-preview"]').click(); await page.locator('.choir-preview svg').first().waitFor();
+  await mkdir("out/browser", {recursive:true}); await page.locator(".choir-preview").screenshot({path:"out/browser/choir-four-parts.png"});
+  const pdfEvent = page.waitForEvent('download', {timeout:60000}); pdfEvent.catch(() => {});
+  await page.locator('.choir-panel button').filter({hasText:/^(导出混排 PDF|Export choir PDF)$/}).click();
+  const pdf = await pdfEvent;
+  assert((await readFile(await pdf.path())).subarray(0,5).equals(Buffer.from('%PDF-')));
+  const pngEvent = page.waitForEvent('download');
+  await page.locator('.choir-panel button').filter({hasText:/^(导出混排 PNG|Export choir PNG)$/}).click();
+  const png = await pngEvent; await png.saveAs('out/browser/choir-page.png');
+  assert((await readFile(await png.path())).subarray(1,4).equals(Buffer.from('PNG')));
   const name = page.locator('.choir-role[data-role="S"] input:not([type=checkbox])');
   await name.fill('Soprano test'); await name.press('Tab');
   const undo = page.locator('.choir-actions button').nth(0), redo = page.locator('.choir-actions button').nth(1);
@@ -52,6 +72,7 @@ try {
   await page.evaluate(() => window.__app.replaceText(window.__app.getText().replace('<octave>5</octave>','<octave>6</octave>')));
   await page.waitForFunction(() => { const box=document.querySelector('.choir-role[data-role="S"] input[type=checkbox]'); return box && !box.checked; });
   for (const role of ['A','T','B']) assert(await page.locator(`.choir-role[data-role="${role}"] input[type=checkbox]`).first().isChecked());
+  await verifyChoirLayout(page);
   await mkdir('out/browser', {recursive:true}); await page.screenshot({path:'out/browser/choir-setup.png',fullPage:true});
   console.log('PASS: staff/mixed baseline + SATB setup/confirmation/undo/redo/project roundtrip/draft recovery/source invalidation');
 } finally {

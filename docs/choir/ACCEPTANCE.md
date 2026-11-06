@@ -23,3 +23,12 @@ Not run: iPhone Safari, Android Chrome, desktop audio, ten-minute session, Supab
 - Not yet validated: full rhythm/repeat/tempo fixture matrix, malformed-file/resource-limit hardening, interactive setup/undo/draft recovery, derived layout, audio exports, microphone/scoring/sharing or any physical phone.
 
 Additional integration evidence: 3/4, 4/4 and 6/8 derived scores roundtrip through the actual MusicXML writer and playback source to independently specified MIDI pitches [72,69,64,48] and durations. Section anchors remap after source element IDs change. This does not yet verify tempo-map/repeat occurrences.
+
+## 2026-11-06 T03/T04 checkpoint (c69242cc)
+- Node22 typecheck: passed. Unit suite: 38/38 passed (15 mapping, 4 project, 4 session, 9 tempo, 2 compiled performance, 4 XML semantics).
+- Browser: actual setup, four role confirmations, undo/redo, .dolcechoir download and reopen, IndexedDB recovery after reload, S-only edit invalidates S while A/T/B remain confirmed: passed in Chromium1248.
+- Timing: manually specified piecewise integration/inverse/speed; repeat target restores tempo; actual MusicXML repeat; later first tempo uses initial90; dotted-unit conversion; conflicts rejected; changing divisions and trailing silence; MIDI tempo tracks, selected part isolation and silent EOT: passed.
+- Not evidence of physical audio output, smartphone mic, production deployment or full upstream private regression.
+
+## T05 local geometry/export evidence
+Node22: 39/39 tests, strict types and Vite production build passed. Chromium: four actual role labels/layers, mm/pt independent sizes, source immutability, synchronized chord x coordinates, actual freshly rendered ink agrees with pagination bounds, 4/8mm group clearances, 32-bar repagination from4 to6pages at12→24pt; PDF and PNG download signatures passed. Screenshots/exports under ignored out/browser. No physical print or mobile acceptance claimed.

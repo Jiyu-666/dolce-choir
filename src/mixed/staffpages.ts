@@ -10,8 +10,10 @@ import { Matrix33 } from "../common/geom";
 import { Font } from "../pagetree/font";
 import { Group, TextFrame } from "../pagetree/pageitem";
 import { harmonyBand, LCR, SKYLINE_BIN, StaffLayout, Notation, ScoreCredit, Sys, type MeasureText, type PartLayout, type TextBlock } from "./model";
+import { inkBounds } from "./ink";
+import { drawJianpuOverlay } from "./jianpuoverlay";
 import { autoStaffDistances } from "./layoutpass";
-import { drawSystem, endingPlace, harmonyWidthOf } from "./render";
+import { drawSystem, drawSysStaff, drawLineObjs, drawChoirLabel, endingPlace, harmonyWidthOf } from "./render";
 
 // -----------------------------------------------------------------------
 // formatMixedScore（formatScorePAO port, without per-song hacks）
@@ -132,12 +134,12 @@ export function placeAboveStaff(score: StaffLayout, mixed: boolean, hosts: reado
   if (score.keepBreaks) autoStaffDistances(score);
 }
 
-function placePartAboveStaff(score: StaffLayout, p: PartLayout, mixed: boolean, hostingOnly = false): void {
+function placePartAboveStaff(score: StaffLayout, p: PartLayout, mixed: boolean, hostingOnly = false, recalculate = true): void {
   if (!p || p.staves.length === 0) return;
   const hosting = (sys: Sys): boolean => p.staves[0]!.getNotation(sys.measures[0].offset) === Notation.Mixed;
   // Calculate mixed staff y positions (needs chords/slurs in place)
-  if (!hostingOnly) p.calcMixedStaffY();
-  else for (const sys of score.systems) if (hosting(sys)) for (const st of sys.staves) if (st.part() === p) st.calcMixedStaffY(sys);
+  if (!hostingOnly && recalculate) p.calcMixedStaffY();
+  else if (recalculate) for (const sys of score.systems) if (hosting(sys)) for (const st of sys.staves) if (st.part() === p) st.calcMixedStaffY(sys);
 
   const eng = score.options;
   const [harmTop, harmBot] = harmonyBand(score);
@@ -718,8 +720,9 @@ export interface StaffPages {
 }
 
 /** 一份已读入的 `StaffLayout` 排成页（`showJianpuLayer` = 混排叠简谱层）。长图会改写 `score.defaults.pageHeight`。 */
-export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, jianpuPart = 0): StaffPages {
-  if (showJianpuLayer) formatMixedScore(score, jianpuPart);
+export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, jianpuPart: number | readonly number[] = 0, groupGap = 12): StaffPages {
+  if (showJianpuLayer && typeof jianpuPart !== "number") formatChoirScore(score, jianpuPart, groupGap);
+  else if (showJianpuLayer) formatMixedScore(score, jianpuPart as number);
   else placeAboveStaff(score, false);
 
   // M5: flow layout
@@ -770,4 +773,51 @@ export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, j
     score, items, layout, d.leftMargin, d.topMargin, pageHeight, d.pageWidth ?? 1200, [...footers],
   );
   return { pages, placed };
+}
+
+/** Multi-part layout is opt-in. Existing book and single-layer geometry stays intact. */
+export function formatChoirScore(score: StaffLayout, parts: readonly number[], groupGap: number): void {
+  const chosen = new Set(parts);
+  for (const [i, part] of score.parts.entries()) {
+    if (chosen.has(i) && part.staves[0]) part.staves[0].notation.set(new Fraction(0), Notation.Mixed);
+    placePartAboveStaff(score, part, chosen.has(i));
+  }
+  for (const sys of score.systems) {
+    for (const st of sys.staves) {
+      if (!st.staffVisible) continue;
+      const t = sys.measures[0].offset;
+      const mixed = st.partStaff.getNotation(t) === Notation.Mixed;
+      if (mixed) {
+        // Match the requested net gap to actual digits/dots/beams and actual staff ink.
+        st.partStaff.notation.set(t, Notation.Normal);
+        const normal = new Group(); drawSysStaff(normal, sys, st, 0);
+        const lines = new Group(); normal.add(lines); lines.y = -sys.yposPart(st.part());
+        drawLineObjs(lines, sys, st.part());
+        const staffTop = inkBounds(normal).top;
+        st.partStaff.notation.set(t, Notation.Mixed);
+        const overlay = new Group();
+        for (const m of sys.measures) drawJianpuOverlay(overlay, sys, st, m);
+        const shift = staffTop - score.options.mixStaffDist - inkBounds(overlay).bottom;
+        st.minY += shift; st.harmonyY -= shift;
+        placePartAboveStaff(score, st.part(), true, false, false);
+      }
+      const ink = new Group(); drawSysStaff(ink, sys, st, 0);
+      const lines = new Group(); ink.add(lines); lines.y = -sys.yposPart(st.part());
+      drawLineObjs(lines, sys, st.part());
+      const b = inkBounds(ink);
+      st.choirLabelY = b.top - 6 - new Font(score.options.wordFont, 10 / score.scaling).charBound("Hg").bottom;
+      drawChoirLabel(ink, sys, st, 0);
+      const full = inkBounds(ink);
+      st.choirInk = [-full.top, -full.bottom];
+    }
+    let previous: typeof sys.staves[number] | undefined;
+    for (const st of sys.staves) {
+      if (!st.staffVisible) continue;
+      if (previous) {
+        const [, bottom] = previous.getYBound(sys), [top] = st.getYBound(sys);
+        st.distance = Math.max(0, -bottom - previous.height() + top + groupGap);
+      } else st.distance = 0;
+      previous = st;
+    }
+  }
 }

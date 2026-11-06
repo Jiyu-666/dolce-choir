@@ -45,6 +45,8 @@ export interface StaffPaintRequest {
   readonly hideBarNumber: boolean;
   /** 混排：简谱层叠在第几个声部上（缺省 0） */
   readonly jianpuPart?: number;
+  readonly jianpuParts?: readonly number[];
+  readonly choirLayout?: import("../choir/project").ChoirLayout;
   /** 谱里的换行换页是源文写明的，当硬断点（`MixedOptions.sourceBreaks`） */
   readonly sourceBreaks?: boolean;
 }
@@ -293,8 +295,15 @@ export class ScorePainter {
     options.hideBarNumber = req.hideBarNumber;
     options.page = req.page;
     options.sourceBreaks = req.sourceBreaks ?? false;
+    if (req.choirLayout) {
+      const c = req.choirLayout;
+      const scale = c.staffMm * 72 / 25.4 / 40;
+      options.staffSizeMm = c.staffMm;
+      options.mixStaffHeight = c.jianpuPt / scale * 40 / options.jianpuFont.size;
+      options.mixStaffDist = c.layerGapMm * 40 / c.staffMm;
+    }
     const score = layoutStaff(req.doc, options);
-    const { pages, placed } = layoutStaffPages(score, req.view === "mixed", req.jianpuPart ?? 0);
+    const { pages, placed } = layoutStaffPages(score, req.view === "mixed", req.jianpuParts ?? req.jianpuPart ?? 0, req.choirLayout ? req.choirLayout.groupGapMm * 40 / req.choirLayout.staffMm : 12);
     const d = score.defaults;
     const wT = d.pageWidth ?? 1200;
     const hT = d.pageHeight ?? PAGE_HEIGHT_FALLBACK;

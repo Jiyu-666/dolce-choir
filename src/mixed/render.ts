@@ -1055,7 +1055,7 @@ function drawTextBlocks(container: Group, data: PartMeasureLayout, subStaff: num
 // -----------------------------------------------------------------------
 // drawLineObjs（render.cpp::drawLineObjs）— span objects per part per system
 
-function drawLineObjs(container: Group, sys: Sys, p: PartLayout): void {
+export function drawLineObjs(container: Group, sys: Sys, p: PartLayout): void {
   const scr = sys.score;
   const eng = scr.options;
 
@@ -1511,7 +1511,7 @@ function drawPartNames(container: Group, sys: Sys): void {
 // -----------------------------------------------------------------------
 // drawSysStaff
 
-function drawSysStaff(container: Group, sys: Sys, st: SysStaff, ypos: number): void {
+export function drawSysStaff(container: Group, sys: Sys, st: SysStaff, ypos: number): void {
   const scr = sys.score;
   const eng = scr.options;
   const ps = st.partStaff;
@@ -1596,6 +1596,7 @@ export function drawSystem(container: Group, sys: Sys): Group {
       : ypos;
     top ??= mixedTop;
     drawSysStaff(res, sys, st, ypos);
+    if (st.choirLabelY !== undefined) drawChoirLabel(res, sys, st, ypos);
     ypos += st.height();
   }
   res.classes.add(STAFF_SYSTEM);
@@ -1609,4 +1610,25 @@ export function drawSystem(container: Group, sys: Sys): Group {
     drawLineObjs(res, sys, p);
   }
   return res;
+}
+
+/** Choir names live inside the music width rather than the legacy left indent. */
+export function drawChoirLabel(container: Group, sys: Sys, st: SysStaff, staffY: number): void {
+  const font = new Font(sys.score.options.wordFont, 10 / sys.score.scaling);
+  const part = st.part();
+  const text = part.name === part.abbrev ? part.name : `${part.abbrev} · ${part.name}`;
+  let line = "", row = 0;
+  const add = () => {
+    const tf = new TextFrame(); tf.text = line; tf.font = font; tf.inkBound = true;
+    tf.x = 0; tf.y = staffY + st.choirLabelY! - row * font.size * 1.2;
+    container.add(tf); row++;
+  };
+  // Precompute lines, then draw them from bottom to top to keep the clearance fixed.
+  const lines: string[] = [];
+  for (const ch of text) {
+    if (line && font.measureText(line + ch) > sys.width()) { lines.push(line); line = ""; }
+    line += ch;
+  }
+  if (line) lines.push(line);
+  for (line of lines.reverse()) add();
 }

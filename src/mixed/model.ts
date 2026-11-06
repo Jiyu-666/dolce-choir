@@ -2653,6 +2653,9 @@ function cubicMaxY(p0: number, p1: number, p2: number, p3: number): number {
 }
 
 export class SysStaff {
+  /** Measured bounds for the additive multi-part choir layout; ordinary layout is unchanged. */
+  choirInk?: [number, number];
+  choirLabelY?: number;
   partStaff: PartStaff;
   distance = 0;
   /** 与上一可见谱表不相碰的最小距离（自动铺排 `layoutpass.ts::autoStaffDistances` 量的）；源谱版面档一页排不下时压到它为止 */
@@ -2961,6 +2964,7 @@ export class SysStaff {
   /** SysStaff::getYBound（model.cpp:2745）。返回 [top, bot]（top 为上方延伸量，向上为正）。
    *  自动铺排再并上 `autoExtent`。 */
   getYBound(sys: Sys): [number, number] {
+    if (this.choirInk) return this.choirInk;
     let minY = -60;
     let maxY = -Infinity;
     const pt = this.part();

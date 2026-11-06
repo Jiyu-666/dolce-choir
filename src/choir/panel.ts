@@ -3,6 +3,8 @@ import { formatOf } from "../editor/formats";
 import { openModal } from "../editor/dialogs";
 import { saveBytes } from "../editor/fileio";
 import { packProject } from "../editor/omrproject";
+import { ScorePainter } from "../layout/painter";
+import { choirPaintRequest, exportChoirPdf, exportChoirPng } from "./layout";
 import { ScorePlayer } from "../editor/player";
 import { loadScoreDoc } from "../model/fromxml";
 import { scoreDocToMusicXml } from "../model/toxml";
@@ -44,12 +46,15 @@ class ChoirPanel {
   private restoring = false;
   private message = "";
   private openedDraft = false;
+  private previewGeneration = 0;
+  private preview: ScorePainter | null = null;
+  private hidden = new Set<number>();
   private readonly player = new ScorePlayer(() => {}, () => {});
   constructor(private readonly app: App) {
     app.choirSourceChanged = (newDocument) => {
       if (this.restoring) return;
       if (newDocument) this.session.clear();
-      this.player.stop(); this.syncing = true; this.sourceValid = false; this.render();
+      this.previewGeneration++; this.preview = null; this.player.stop(); this.syncing = true; this.sourceValid = false; this.render();
       clearTimeout(this.timer);
       this.timer = setTimeout(() => void this.sync(), 250);
     };
@@ -91,7 +96,7 @@ class ChoirPanel {
   }
   private edit(change: Parameters<ChoirSession["edit"]>[0]): void {
     if (this.syncing || !this.sourceValid) return;
-    this.player.stop(); this.session.edit(change); this.render(); this.draft();
+    this.previewGeneration++; this.preview = null; this.player.stop(); this.session.edit(change); this.render(); this.draft();
   }
   private snapshot(): ChoirProject {
     const p = this.session.project;
@@ -109,7 +114,7 @@ class ChoirPanel {
   }
   private async run(action: () => Promise<void>, success = "", repaint = true): Promise<void> {
     try { await action(); this.message = success; }
-    catch { this.message = t("choir.failed"); }
+    catch (error) { console.error("Choir operation failed", error); this.message = t("choir.failed"); }
     if (repaint) this.render();
     else { const status = this.body?.querySelector("[role=status]"); if (status) status.textContent = this.message; }
   }
@@ -126,7 +131,7 @@ class ChoirPanel {
         const ext = p.editorSource.format === "fanqie" ? "txt" : p.editorSource.format === "jly" ? "jly" : p.editorSource.format;
         this.app.importBytes(format.encode(p.editorSource.text), `source.${ext}`);
       } else this.app.importBytes(new TextEncoder().encode(p.sourceXml), "source.musicxml");
-      this.session.restore(p);
+      this.previewGeneration++; this.preview = null; this.session.restore(p);
     } finally { this.restoring = false; }
     this.sourceValid = true; this.syncing = false; this.draft();
   }
@@ -147,8 +152,8 @@ class ChoirPanel {
     body.replaceChildren();
     const project = this.session.project;
     const tools = element("div"); tools.className = "choir-actions";
-    const undo = button(t("choir.undo"), () => { this.session.undo(); this.render(); this.draft(); }); undo.disabled = !this.session.canUndo || this.syncing || !this.sourceValid;
-    const redo = button(t("choir.redo"), () => { this.session.redo(); this.render(); this.draft(); }); redo.disabled = !this.session.canRedo || this.syncing || !this.sourceValid;
+    const undo = button(t("choir.undo"), () => { this.previewGeneration++; this.preview = null; this.session.undo(); this.render(); this.draft(); }); undo.disabled = !this.session.canUndo || this.syncing || !this.sourceValid;
+    const redo = button(t("choir.redo"), () => { this.previewGeneration++; this.preview = null; this.session.redo(); this.render(); this.draft(); }); redo.disabled = !this.session.canRedo || this.syncing || !this.sourceValid;
     const open = element("input"); open.type = "file"; open.accept = ".dolcechoir"; open.hidden = true;
     open.addEventListener("change", () => { const f = open.files?.[0]; if (f) void this.run(async () => this.restore(new Uint8Array(await f.arrayBuffer()))); });
     const save = button(t("choir.save"), () => void this.run(async () => { const bytes = packChoirProject(this.snapshot()); await saveBytes(bytes, `${this.app.documentTitle() || "choir"}.dolcechoir`); }));
@@ -168,7 +173,7 @@ class ChoirPanel {
       lane.append(new Option(t("choir.choose"), ""));
       lanes.forEach((l, i) => lane.append(new Option(`${doc.songs[0].parts.find(p => p.id === l.partId)?.name ?? l.partId} · ${t("choir.lane", { staff: l.staff, voice: l.voice })}`, String(i))));
       lane.value = String(lanes.findIndex(l => l.partId === binding.partId && l.staff === binding.staff && l.voice === binding.voice));
-      lane.addEventListener("change", () => { const l = lanes[Number(lane.value)]; if (l) this.edit(p => setLane(p.mapping.bindings.find(b => b.role === binding.role)!, l)); });
+      lane.addEventListener("change", () => { const l = lane.value === "" ? undefined : lanes[Number(lane.value)]; if (l) this.edit(p => setLane(p.mapping.bindings.find(b => b.role === binding.role)!, l)); });
       const confirm = element("input"); confirm.type = "checkbox"; confirm.checked = binding.confirmed;
       confirm.addEventListener("change", () => this.edit(p => { p.mapping.bindings.find(b => b.role === binding.role)!.confirmed = confirm.checked; }));
       const confirmLabel = element("label", t("choir.confirm")); confirmLabel.prepend(confirm);
@@ -197,5 +202,38 @@ class ChoirPanel {
     const list = element("ul"); list.dataset.testid = "choir-issues";
     for (const issue of issues) list.append(element("li", `${issue.role ?? ""} ${issue.measure !== undefined ? t("choir.measure", { n: issue.measure + 1 }) : ""} ${t(issueKeys[issue.code])}`));
     body.append(issues.length ? list : element("p", t("choir.ready")));
+    const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
+    const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;
+    for (const key of ["staffMm", "jianpuPt", "layerGapMm", "groupGapMm"] as const) {
+      const input = element("input"); input.type = "number"; input.value = String(project.layout[key]);
+      const [min, max, step] = ranges[key]; input.min = String(min); input.max = String(max); input.step = String(step);
+      input.dataset.layout = key; input.setAttribute("aria-label", t(`choir.layout.${key}`));
+      input.addEventListener("change", () => { const v = input.valueAsNumber; if (Number.isFinite(v) && v >= min && v <= max) this.edit(p => { p.layout[key] = v; }); });
+      const label = element("label", t(`choir.layout.${key}`)); label.append(input); layout.append(label);
+    }
+    for (const [i, role] of ROLES.entries()) {
+      const check = element("input"); check.type = "checkbox"; check.checked = !this.hidden.has(i);
+      check.addEventListener("change", () => { if (check.checked) this.hidden.delete(i); else this.hidden.add(i); this.previewGeneration++; this.preview = null; this.render(); });
+      const label = element("label", t(`choir.role.${role}`)); label.prepend(check); layout.append(label);
+    }
+    const show = button(t("choir.preview"), () => void this.run(async () => {
+      const generation = ++this.previewGeneration;
+      const p = this.snapshot(), result = this.session.projection;
+      if (!result?.doc) throw new Error("Unconfirmed mapping");
+      const painter = new ScorePainter(this.app.painter.resources);
+      await painter.load(choirPaintRequest(result.doc, p.layout, this.hidden));
+      if (generation !== this.previewGeneration || this.session.project?.mapping.revision !== p.mapping.revision) return;
+      this.preview = painter;
+    }));
+    show.disabled = issues.length > 0 || this.hidden.size === 4; show.dataset.testid = "choir-preview";
+    layout.append(show); body.append(layout);
+    if (this.preview) {
+      const painter = this.preview, actions = element("div"); actions.className = "choir-actions";
+      actions.append(button(t("choir.pdf"), () => void this.run(() => exportChoirPdf(painter, this.app.documentTitle()))),
+        button(t("choir.png"), () => void this.run(() => exportChoirPng(painter, this.app.documentTitle()))));
+      const pages = element("div"); pages.className = "choir-preview";
+      for (let i = 0; i < painter.pageCount; i++) pages.append(painter.renderPage(i));
+      body.append(actions, pages);
+    }
   }
 }

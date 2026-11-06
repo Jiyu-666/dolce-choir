@@ -66,7 +66,7 @@ function paintBg(svg: SVGSVGElement, bgColor: number): void {
 
 /** Serialize a page <svg> with Bravura embedded so it rasterizes faithfully.
  *  `bg` 是纸张底色（CSS 颜色）——SVG 自身是透明的，不铺底导出的 PNG 会是透明背景。 */
-async function svgToBytes(svg: SVGSVGElement, scale: number, bg = "#fff"): Promise<Uint8Array> {
+export async function svgToBytes(svg: SVGSVGElement, scale: number, bg = "#fff"): Promise<Uint8Array> {
   const { width: w, height: h } = svgSize(svg);
   const clone = svg.cloneNode(true) as SVGSVGElement;
   clone.setAttribute("xmlns", SVG_NS);
