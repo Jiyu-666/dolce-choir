@@ -8,15 +8,30 @@ import type { ChoirLayout } from "./project";
 import { compilePerformance, type PerformancePlan } from "./performance";
 import { MicrophoneInput } from "./microphone";
 import { PracticeTransport, type PracticeState } from "./transport";
+import { PracticeComparison, liveComparison, type PracticeResult } from "./comparison";
+import { calibrateLatency } from "./latency";
+import { sourceRevision } from "./project";
+import { scoreDocToMusicXml } from "../model/toxml";
 import "./practice.css";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = ""): HTMLElementTagNameMap[K] { const node = document.createElement(tag); node.textContent = text; return node; }
-export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayout, resources: PaintResources): void {
+export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayout, resources: PaintResources): () => void {
+  const all = compilePerformance(doc, revision, { role: "S" });
   const body = el("div"); body.className = "practice-view";
   const controls = el("div"); controls.className = "practice-controls";
   const status = el("p"); status.setAttribute("role", "status"); status.dataset.testid = "practice-state";
   const clock = el("output"), score = el("div"); score.className = "practice-score";
   const warning = el("p", t("practice.transportOnly"));
+  const tempoText=el("p");
+  const feedback = el("p"), summary = el("section"); feedback.className = "practice-feedback";
+  feedback.dataset.testid = "practice-feedback"; feedback.setAttribute("role","status"); summary.dataset.testid = "practice-summary";
+  const fingerprint = sourceRevision(scoreDocToMusicXml(doc));
+  let comparison: PracticeComparison | null = null, attempt = 0, calibrationKey: string | null = null;
+  let calibrationController: AbortController | null = null;
+  const delay = el("input"); delay.type="number"; delay.min="-500"; delay.max="500"; delay.value="0"; delay.step="5";
+  delay.dataset.testid="practice-latency";
+  const calibrate = el("button",t("practice.calibrate")), delayStatus=el("p",t("practice.rhythmEstimated"));
+  calibrate.disabled=!MicrophoneInput.supported();
   let role: ChoirRole = "S", plan: PerformancePlan, painter = new ScorePainter(resources), paintGeneration = 0;
   let activeId: number | undefined, activeSystem: Element | null = null;
   const start = el("button", t("practice.start")), pause = el("button", t("practice.pause")), stop = el("button", t("practice.stop"));
@@ -24,10 +39,18 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
   const micText = el("p"), mic = el("input"); mic.type = "checkbox"; mic.checked = MicrophoneInput.supported(); mic.disabled = !mic.checked; mic.dataset.testid = "practice-microphone";
   const input = new MicrophoneInput({
     frame: frame => {
-      if (transport.state !== "practicing") return;
-      micText.textContent = frame.state === "pitched" ? t("practice.pitch", { hz: frame.frequency!.toFixed(1), clarity: frame.clarity.toFixed(2) }) : t(`practice.input.${frame.state}`);
+      if(!comparison||!["count-in","practicing"].includes(transport.state))return;
+      const seconds=transport.planSecondsAtAudioTime(frame.audioTime),active=transport.isPerformanceAudioTime(frame.audioTime);
+      comparison.add(frame,seconds,active,transport.activeFrom);
+      if(!active||seconds-delay.valueAsNumber/1000<transport.activeFrom||seconds-delay.valueAsNumber/1000>=plan.durationSeconds)return;
+      const result=liveComparison(plan,frame,seconds-delay.valueAsNumber/1000,transport.audioContext!.sampleRate);
+      feedback.dataset.state=result.state;
+      feedback.textContent=t(`practice.feedback.${result.state}`)+(result.cents===undefined?"":` (${result.cents>0?"+":""}${Math.round(result.cents)} ${t("practice.cents")})`);
     },
-    gap: () => { micText.textContent = t("practice.analysisGap"); },
+    gap: gap => {
+      if(comparison&&["count-in","practicing"].includes(transport.state))comparison.gap({from:transport.planSecondsAtAudioTime(gap.from),to:transport.planSecondsAtAudioTime(gap.to)});
+      feedback.dataset.state="uncertain"; feedback.textContent = t("practice.analysisGap");
+    },
     error: () => { transport.pause(); micText.textContent = t("practice.micError"); },
   });
   const transport = new PracticeTransport({
@@ -35,18 +58,23 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
       if (!mic.checked) return;
       micText.textContent = t("practice.quietCalibrating");
       await input.start(ctx, signal);
+      if(!comparison)comparison=new PracticeComparison(plan,await fingerprint,attempt,ctx.sampleRate,{seconds:delay.valueAsNumber/1000,calibrated:calibrationKey!==null&&calibrationKey===input.deviceKey});
+      delayStatus.textContent=t(comparison.latency.calibrated?"practice.rhythmCalibrated":"practice.rhythmEstimated");
       const settings = input.settings!;
       micText.textContent = t("practice.micSettings", { rate: settings.sampleRate, echo: String(settings.echoCancellation ?? "?"), gain: String(settings.autoGainControl ?? "?"), noise: String(settings.noiseSuppression ?? "?") });
     },
     state: (state: PracticeState, error?: unknown) => {
       if (state === "ready" && plan) { painter.highlight(null); clock.textContent = `0 / ${plan.durationSeconds.toFixed(1)} s`; }
       status.dataset.state = state; status.textContent = t(`practice.state.${state}`);
+      if(["ready","paused","count-in","loading","error"].includes(state)){feedback.dataset.state="uncertain";feedback.textContent=state==="count-in"?t("practice.noCountInScore"):"";}
+      if(state==="practicing")comparison?.resume(transport.audioContext!.currentTime);
+      if(state==="completed"&&comparison)showResult(comparison.result());
       if (state === "error" && error instanceof Error) micText.textContent = error.message === "Quiet environment needed" ? t("practice.quietRetry") : t("practice.micError");
-      start.disabled = ["loading", "count-in", "practicing"].includes(state);
+      start.disabled = !!calibrationController || ["loading", "count-in", "practicing"].includes(state);
       pause.disabled = !["loading", "count-in", "practicing"].includes(state);
     },
-    attempt: number => { status.dataset.attempt = String(number); },
-    rewind: () => { activeId = undefined; painter.highlight(null); },
+    attempt: number => { attempt=number;comparison=null;summary.replaceChildren();status.dataset.attempt = String(number); },
+    rewind: (to,at,audioTime) => { comparison?.rewind(to,at,audioTime);activeId = undefined; painter.highlight(null); },
     tick: (seconds, count) => {
       clock.textContent = count ? t("practice.count", { n: count }) : `${seconds.toFixed(1)} / ${plan.durationSeconds.toFixed(1)} s`;
       const anchor = [...plan.anchors].reverse().find(a => a.seconds <= seconds + .01);
@@ -57,7 +85,6 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
       }
     },
   });
-  const all = compilePerformance(doc, revision, { role });
   const from = el("select"), to = el("select"); from.dataset.testid = "practice-from"; to.dataset.testid = "practice-to";
   for (const [i, m] of all.measures.entries()) {
     const text = t("practice.measure", { measure: m.measure + 1, occurrence: m.occurrence });
@@ -78,14 +105,52 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
   }
   setting(t("practice.from"), from); setting(t("practice.to"), to); setting(t("practice.speed"), speed); setting(t("practice.octaveLabel"), octave);
   setting(t("practice.microphone"), mic); setting(t("practice.piano"), piano); setting(t("practice.metronome"), metronome); setting(t("practice.loop"), loop);
+  setting(t("practice.delayMs"),delay);controls.append(calibrate);
+  calibrate.addEventListener("click",()=>void(async()=>{
+    if(calibrationController)return;
+    configure();const controller=new AbortController();calibrationController=controller;start.disabled=true;calibrate.disabled=true;
+    controls.inert=true;roles.inert=true;
+    delayStatus.textContent=t("practice.calibrationInstructions");
+    try{
+      const result=await calibrateLatency(controller.signal);delay.value=String(Math.round(result.seconds*1000));calibrationKey=result.deviceKey;
+      delayStatus.textContent=t("practice.calibrationDone",{ms:Math.round(result.seconds*1000),spread:Math.round(result.spread*1000)});configure();
+    }catch{calibrationKey=null;delayStatus.textContent=t("practice.calibrationFailed");}
+    finally{calibrationController=null;controls.inert=false;roles.inert=false;calibrate.disabled=!MicrophoneInput.supported();configure();}
+  })());
+  delay.addEventListener("change",()=>{calibrationKey=null;delayStatus.textContent=t("practice.rhythmEstimated");configure();});
+  const deviceChanged=()=>{calibrationKey=null;calibrationController?.abort();configure();delayStatus.textContent=t("practice.deviceChanged");};
+  navigator.mediaDevices?.addEventListener("devicechange",deviceChanged);
   function configure(): void {
-    if (!speed.checkValidity() || Number(to.value) < Number(from.value)) { transport.stop(); status.textContent = t("practice.invalidRange"); start.disabled = true; return; }
+    comparison=null;summary.replaceChildren();
+    if (!speed.checkValidity() || !delay.checkValidity() || Number(to.value) < Number(from.value)) { transport.stop(); status.textContent = t("practice.invalidRange"); start.disabled = true; return; }
     plan = compilePerformance(doc, revision, { role, speed: speed.valueAsNumber, octave: Number(octave.value) as -1|0|1, fromOccurrence: Number(from.value), toOccurrence: Number(to.value) });
     warning.textContent = mic.checked ? t("practice.micTrial") : t("practice.transportOnly");
+    tempoText.textContent=t(plan.assumedInitialTempo?"practice.defaultTempo":"practice.initialTempo",{bpm:plan.tempos[0].bpm,speed:plan.speed});
     if (!MicrophoneInput.supported()) micText.textContent = t("practice.micUnsupported");
-    transport.configure(plan, { piano: piano.checked, metronome: metronome.checked, loop: loop.checked });
+    transport.configure(plan, { piano: piano.checked, metronome: metronome.checked, loop: loop.checked,captureTail:mic.checked?Math.max(0,delay.valueAsNumber/1000)+.12:0 });
     for (const button of roles.querySelectorAll("button")) button.setAttribute("aria-pressed", String(button.dataset.role === role));
     activeId = undefined; painter.highlight(null); clock.textContent = `0 / ${plan.durationSeconds.toFixed(1)} s`;
+  }
+  function showResult(result:PracticeResult):void{
+    const percent=(n:number)=>`${Math.round(n*100)}%`;
+    summary.replaceChildren(el("h3",t("practice.result")),el("p",t("practice.coverage",{percent:percent(result.coverage)})),
+      el("p",result.pitchConclusion===null?t("practice.insufficientCoverage"):t("practice.accuracy",{percent:percent(result.pitchConclusion)})),
+      el("p",t("practice.rhythmSummary",{judged:result.rhythm.judged,within:result.rhythm.withinTolerance,ms:result.rhythm.meanAbsoluteOffsetSeconds===null?"—":Math.round(result.rhythm.meanAbsoluteOffsetSeconds*1000)})),
+      el("p",t(result.rhythm.estimated?"practice.rhythmEstimated":"practice.rhythmCalibrated")),
+      el("p",t("practice.restVoicing",{seconds:result.restVoicingSeconds.toFixed(1)})));
+    for(const i of result.problemMeasures){
+      const m=plan.measures[i],retry=el("button",t("practice.retryMeasure",{measure:m.measure+1,occurrence:m.occurrence}));
+      const index=Number(from.value)+i;
+      retry.addEventListener("click",()=>{from.value=to.value=String(index);configure();void transport.start();});summary.append(retry);
+    }
+    const details=el("details"),heading=el("summary",t("practice.noteResults"));details.append(heading);
+    details.addEventListener("toggle",()=>{
+      if(!details.open||details.children.length>1)return;
+      const table=el("table"),head=el("tr");for(const label of ["note","state","coverageLabel","accuracyLabel","onsetLabel"] as const)head.append(el("th",t(`practice.column.${label}`)));table.append(head);
+      result.notes.forEach((n,i)=>{
+        const row=el("tr");for(const text of [String(i+1),t(`practice.feedback.${n.status}`),n.eligibleSeconds?percent(n.judgedSeconds/n.eligibleSeconds):"—",n.judgedSeconds?percent(n.correctSeconds/n.judgedSeconds):"—",n.onsetOffsetSeconds===null?t("practice.onsetUnknown"):`${Math.round(n.onsetOffsetSeconds*1000)} ms`])row.append(el("td",text));table.append(row);
+      });details.append(table);
+    });summary.append(details);
   }
   async function paint(): Promise<void> {
     const gen = ++paintGeneration, selected = ROLES.indexOf(role), next = new ScorePainter(resources);
@@ -96,12 +161,13 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
     for (let i = 0; i < painter.pageCount; i++) score.append(painter.renderPage(i));
   }
   for (const input of [from,to,speed,octave,piano,metronome,loop,mic]) input.addEventListener("change", configure);
-  start.addEventListener("click", () => void transport.start()); pause.addEventListener("click", () => transport.pause()); stop.addEventListener("click", () => transport.stop());
+  start.addEventListener("click", () => { if(!calibrationController)void transport.start(); }); pause.addEventListener("click", () => transport.pause()); stop.addEventListener("click", () => {calibrationController?.abort();transport.stop();});
   const actions = el("div"); actions.className = "practice-actions"; actions.append(start,pause,stop,clock);
-  body.append(roles,controls,warning,status,micText,actions,score);
+  body.append(roles,controls,warning,tempoText,status,micText,delayStatus,actions,feedback,summary,score);
   const close = el("button", t("parts.done"));
-  const modal = openModal({ title: doc.songs[0].work.title || t("practice.title"), boxClass: "practice-box", body: [body], footer: [close], onClose: () => { paintGeneration++; transport.dispose(); input.stop(); } });
+  const modal = openModal({ title: doc.songs[0].work.title || t("practice.title"), boxClass: "practice-box", body: [body], footer: [close], onClose: () => { paintGeneration++; calibrationController?.abort();transport.dispose(); input.stop();navigator.mediaDevices?.removeEventListener("devicechange",deviceChanged); } });
   close.addEventListener("click", modal.close);
   function requestPaint(): void { void paint().catch(error => { console.error(error); status.textContent = t("choir.failed"); }); }
   configure(); requestPaint();
+  return modal.close;
 }

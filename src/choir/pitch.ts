@@ -7,6 +7,7 @@ export interface PitchFrame {
   clarity: number; rms: number; state: "pitched" | "silent" | "uncertain";
 }
 export interface AnalysisGap { from: number; to: number }
+export interface CapturePeak { audioTime: number; amplitude: number }
 export class PitchAnalyzer {
   private detector = PitchDetector.forFloat32Array(PITCH_WINDOW);
   private recent: number[] = [];

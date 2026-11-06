@@ -3,13 +3,13 @@ import { loadPiano, RELEASE, schedulePianoNote, type PianoSamples } from "./pian
 import type { PerformancePlan } from "./performance";
 
 export type PracticeState = "ready" | "loading" | "count-in" | "practicing" | "paused" | "completed" | "error";
-export interface TransportSettings { piano: boolean; metronome: boolean; loop: boolean }
+export interface TransportSettings { piano: boolean; metronome: boolean; loop: boolean; captureTail?: number }
 export interface PracticeCallbacks {
   prepare?: (context: AudioContext, signal: AbortSignal) => Promise<void>;
   state: (state: PracticeState, error?: unknown) => void;
   tick: (seconds: number, count: number | null) => void;
   attempt: (number: number) => void;
-  rewind: (seconds: number) => void;
+  rewind: (seconds: number, pausedAt: number, audioTime: number) => void;
 }
 export function countIn(plan: PerformancePlan, position: number): { count: number; step: number } {
   const measure = plan.measures.find(m => m.startSeconds <= position && m.endSeconds > position) ?? plan.measures[0];
@@ -45,7 +45,11 @@ export class PracticeTransport {
   private countTotal = 0;
   get plan(): PerformancePlan | null { return this.value; }
   get audioContext(): AudioContext | null { return this.ctx; }
-  get seconds(): number { return this.ctx && ["count-in", "practicing"].includes(this.state) ? Math.max(this.resumeAt, this.ctx.currentTime - this.base) : this.resumeAt; }
+  get seconds(): number { return this.ctx && ["count-in", "practicing"].includes(this.state) ? Math.min(this.value!.durationSeconds, Math.max(this.resumeAt, this.ctx.currentTime - this.base)) : this.resumeAt; }
+  get activeFrom(): number { return this.resumeAt; }
+  isPerformanceAudioTime(audioTime: number): boolean {
+    return !!this.value && ["count-in","practicing"].includes(this.state) && audioTime >= this.base + this.resumeAt && audioTime < this.base + this.value.durationSeconds + (this.settings.captureTail ?? 0);
+  }
   constructor(private callbacks: PracticeCallbacks) { document.addEventListener("visibilitychange", this.visibility); }
   configure(plan: PerformancePlan, settings: TransportSettings): void {
     this.stop(); this.value = freeze(structuredClone(plan)); this.settings = { ...settings }; this.samples = null;
@@ -104,7 +108,7 @@ export class PracticeTransport {
     if (this.settings.metronome) while (this.clickIndex < plan.clicks.length && this.base + plan.clicks[this.clickIndex].seconds < horizon) {
       const click = plan.clicks[this.clickIndex++]; this.click(this.base + click.seconds, click.down);
     }
-    if (ctx.currentTime >= this.base + plan.durationSeconds) {
+    if (ctx.currentTime >= this.base + plan.durationSeconds + (this.settings.captureTail ?? 0)) {
       this.resumeAt = plan.durationSeconds; this.callbacks.tick(this.resumeAt, null); this.clear(); this.setState("completed");
       if (this.settings.loop) void this.start();
     }
@@ -118,8 +122,8 @@ export class PracticeTransport {
   pause(): void {
     if (!["loading", "count-in", "practicing"].includes(this.state) || !this.value) return;
     const position = this.seconds;
-    this.resumeAt = this.value.measures.find(m => m.startSeconds <= position && m.endSeconds > position)?.startSeconds ?? 0;
-    this.generation++; this.clear(); this.callbacks.rewind(this.resumeAt); this.callbacks.tick(this.resumeAt, null); this.setState("paused");
+    this.resumeAt = [...this.value.measures].reverse().find(m => m.startSeconds <= position)?.startSeconds ?? 0;
+    this.generation++; this.clear(); this.callbacks.rewind(this.resumeAt, position, this.ctx?.currentTime ?? 0); this.callbacks.tick(this.resumeAt, null); this.setState("paused");
   }
   stop(): void { this.generation++; this.clear(); this.resumeAt = 0; this.setState("ready"); }
   private clear(): void {

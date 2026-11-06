@@ -43,7 +43,7 @@ test("window-center timestamps and missing input are independent of delivery tim
 test("strong second harmonic records the actual octave ambiguity without target-dependent folding",()=>{
   const errors:number[]=[];
   for(const frequency of [65.4064,110,220,440]){
-    const analyzer=new PitchAnalyzer(48000), samples=tone(frequency,48000,0,8);
+    const analyzer=new PitchAnalyzer(48000), samples=tone(frequency,48000,0,8).map(x=>x*.1);
     const result=analyzer.analyze(samples,0);expect(result.frequency).not.toBeNull();
     expect(result.frequency).toBe(result.rawFrequency);
     errors.push(1200*Math.log2(result.frequency!/frequency));

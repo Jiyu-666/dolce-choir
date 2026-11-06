@@ -48,6 +48,7 @@ class ChoirPanel {
   private openedDraft = false;
   private audioJob: AbortController | null = null;
   private audioProgress = "";
+  private practiceClose: (() => void) | null = null;
   private previewGeneration = 0;
   private preview: ScorePainter | null = null;
   private hidden = new Set<number>();
@@ -55,6 +56,7 @@ class ChoirPanel {
   constructor(private readonly app: App) {
     app.choirSourceChanged = (newDocument) => {
       if (this.restoring) return;
+      this.practiceClose?.(); this.practiceClose = null;
       if (newDocument) this.session.clear();
       this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.player.stop(); this.syncing = true; this.sourceValid = false; this.render();
       clearTimeout(this.timer);
@@ -116,7 +118,7 @@ class ChoirPanel {
   }
   private async run(action: () => Promise<void>, success?: string, repaint = true): Promise<void> {
     try { this.message = ""; await action(); if (success !== undefined) this.message = success; }
-    catch (error) { console.error("Choir operation failed", error); this.message = t("choir.failed"); }
+    catch (error) { console.error("Choir operation failed", error); this.message = t(error instanceof Error&&/control|tempo|play order/i.test(error.message)?"choir.musicProblem":"choir.failed"); }
     if (repaint) this.render();
     else { const status = this.body?.querySelector("[role=status]"); if (status) status.textContent = this.message; }
   }
@@ -230,7 +232,7 @@ class ChoirPanel {
       const p = this.snapshot(), result = this.session.projection;
       if (!result?.doc) throw new Error("Unconfirmed mapping");
       const { showPractice } = await import("./practice");
-      this.close?.(); showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources);
+      this.practiceClose?.(); this.practiceClose = showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources); this.close?.();
     }));
     practice.disabled = issues.length > 0; practice.dataset.testid = "choir-practice";
     body.append(tracks, cancel, progress, practice);

@@ -2,6 +2,7 @@ import { unzipSync } from 'fflate';
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { verifyComparisonUI } from './comparison-ui.mjs';
 import { verifyMicrophone } from './microphone.mjs';
 import { verifyTransport } from './transport.mjs';
 import { verifyAudioExport } from './audio-export.mjs';
@@ -120,6 +121,7 @@ try {
   await verifyChoirLayout(page);
   await verifyAudioExport(page);
   await verifyMicrophone(browser);
+  await verifyComparisonUI(browser,xml);
   await mkdir('out/browser', {recursive:true}); await page.screenshot({path:'out/browser/choir-setup.png',fullPage:true});
   console.log('PASS: staff/mixed baseline + SATB setup/confirmation/undo/redo/project roundtrip/draft recovery/source invalidation');
 } finally {

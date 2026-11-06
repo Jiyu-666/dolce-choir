@@ -1,11 +1,12 @@
 import workletUrl from "./capture.worklet.ts?worker&url";
-import type { AnalysisGap, PitchFrame } from "./pitch";
+import type { AnalysisGap, PitchFrame, CapturePeak } from "./pitch";
 
 export interface MicrophoneSettings { sampleRate: number; channelCount?: number; autoGainControl?: boolean; noiseSuppression?: boolean; echoCancellation?: boolean }
 export interface MicrophoneCallbacks {
   frame: (frame: PitchFrame) => void;
   gap: (gap: AnalysisGap) => void;
   error: (error: unknown) => void;
+  peak?: (peak: CapturePeak) => void;
 }
 /** No recording storage or monitor path. PCM is transferred and discarded after local analysis. */
 export class MicrophoneInput {
@@ -20,6 +21,8 @@ export class MicrophoneInput {
   private removeAbort: (() => void) | null = null;
   private timer: ReturnType<typeof setTimeout> | undefined;
   settings: MicrophoneSettings | null = null;
+  /** Session-only identity for invalidating a device-path calibration; never shared or uploaded. */
+  deviceKey: string | null = null;
   constructor(private callbacks: MicrophoneCallbacks) {}
   static supported(): boolean { return !!navigator.mediaDevices?.getUserMedia && typeof AudioWorkletNode !== "undefined" && typeof Worker !== "undefined"; }
   async start(ctx: AudioContext, signal: AbortSignal): Promise<{ noiseRms: number }> {
@@ -36,12 +39,13 @@ export class MicrophoneInput {
       const track = stream.getAudioTracks()[0]; if (!track) throw new Error("No microphone track");
       const actual = track.getSettings();
       this.settings={sampleRate:ctx.sampleRate,channelCount:actual.channelCount,autoGainControl:actual.autoGainControl,noiseSuppression:actual.noiseSuppression,echoCancellation:actual.echoCancellation};
+      this.deviceKey=JSON.stringify([actual.deviceId,ctx.sampleRate,actual.echoCancellation,actual.autoGainControl,actual.noiseSuppression]);
       track.addEventListener("ended",()=>{if(generation===this.generation){this.stop();this.callbacks.error(new Error("Microphone disconnected"));}},{once:true});
       const worker = new Worker(new URL("./pitch.worker.ts",import.meta.url),{type:"module"}); this.worker=worker;
       worker.postMessage({id:0,sampleRate:ctx.sampleRate});
       const calibration = new Promise<{noiseRms:number}>((resolve,reject)=>{
         this.rejectCalibration=reject;
-        worker.onmessage=(event:MessageEvent<{id?:number;frames?:PitchFrame[];gap?:AnalysisGap;error?:string;calibration?:{quiet:boolean;noiseRms:number}}>)=>{
+        worker.onmessage=(event:MessageEvent<{id?:number;frames?:PitchFrame[];gap?:AnalysisGap;peak?:CapturePeak;error?:string;calibration?:{quiet:boolean;noiseRms:number}}>)=>{
           if(generation!==this.generation)return;
           const data=event.data; if(data.id!==undefined)this.pending.delete(data.id);
           if(data.error){this.stop();this.callbacks.error(new Error(data.error));return;}
@@ -51,6 +55,7 @@ export class MicrophoneInput {
             else reject(new Error("Quiet environment needed"));
           }
           if(data.gap)this.callbacks.gap(data.gap);
+          if(data.peak)this.callbacks.peak?.(data.peak);
           for(const frame of data.frames??[])this.callbacks.frame(frame);
         };
         worker.onerror=()=>{this.stop();this.callbacks.error(new Error("Pitch analysis worker failed"));};

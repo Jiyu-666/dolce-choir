@@ -10,6 +10,9 @@ self.onmessage = (event: MessageEvent<{sampleRate?:number; samples?:Float32Array
     if (!analyzer || !data.samples || data.firstFrame === undefined) return;
     calibrationStart ??= data.firstFrame/analyzer.sampleRate;
     const {frames,gap} = analyzer.push(data.samples,data.firstFrame);
+    let amplitude=0,index=0;
+    for(let i=0;i<data.samples.length;i++)if(Math.abs(data.samples[i])>amplitude){amplitude=Math.abs(data.samples[i]);index=i;}
+    const peak={audioTime:(data.firstFrame+index)/analyzer.sampleRate,amplitude};
     for (const frame of frames) if (!calibrated) {
       noise.push(frame.rms);
       if (frame.clarity >= .85 && frame.rms > .004) tonalFrames++;
@@ -19,6 +22,6 @@ self.onmessage = (event: MessageEvent<{sampleRate?:number; samples?:Float32Array
         self.postMessage({calibration:{quiet:rms<.02 && tonalFrames<3,noiseRms:rms}});
       }
     }
-    self.postMessage({id:data.id,frames:calibrated?frames:[],gap});
+    self.postMessage({id:data.id,frames:calibrated?frames:[],gap,peak});
   } catch(error) { self.postMessage({id:data.id,error:String(error)}); }
 };

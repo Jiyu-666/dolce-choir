@@ -1,46 +1,44 @@
-# Acceptance evidence
+# Execution status
 
-## Baseline
-Upstream commit bb3333208d53b74bedb58b8530b1402eed54ed01; public repo lacks author's ../dev private tests. No upstream OMR regression corpus available.
+Input commit: bb3333208d53b74bedb58b8530b1402eed54ed01. Branch: feat/choir-v1.
 
-## Music/data gate
-Pending: explicit branches, chord ambiguity, metadata/marks, repeat/tempo and source immutability.
+| Task | State | Evidence / next action |
+|---|---|---|
+| T00 | 已验证 | User completed fork flow; renamed to Jiyu-666/dolce-choir in GitHub UI; fork provenance shown. origin/upstream set, feat/choir-v1 push succeeded. |
+| T01 | 已实现待验证 | Node22 typecheck/build + 38 public tests + Chromium original staff/mixed smoke passed. CI defined; broader handmade rhythm/repeat fixtures and remote CI pending. |
+| T02 | 已实现待验证 | 15 mapping + 4 XML music-semantic tests pass; chord-tone slurs/pitchless notes now fail correctly. Broader uncommon-jump corpus still pending. |
+| T03 | 已实现待验证 | UI setup/confirmation/solo/source note location, undo/redo, ZIP + raw editor source/OMR recovery, IndexedDB draft, per-lane invalidation; Chromium save/reopen/draft/invalidation passed. Real OMR roundtrip still pending. |
+| T04 | 已实现待验证 | Shared TempoClock, repeat occurrences, numeric/dotted tempo, MIDI tempi, true selected-part playback, compiled PerformancePlan. Nine tempo + two performance tests pass. Broader jump/tie combinations remain to extend. |
+| T05 | 已实现待验证 | Four-layer preview + PDF/PNG; independent mm/pt controls; measured ink clearances; 32-bar SATB browser test passed (12pt:4pages, 24pt:6pages). Source unchanged, simultaneous x aligned. Physical print/phone and wider curve fixtures pending. |
+| T06 | 已实现待验证 | Four true single-role piano MP3/MIDI ZIP with attribution, sample loader/shared scheduler, continuous Worker encoder,20s blocks/two-pass whole-track peak, cancel/revision guard. Chromium scale/silence/seam/cancel/600s decode and UI ZIP passed. Real phone download/listen and memory profiling pending. |
+| T07 | 已实现待验证 | Practice UI + immutable transport, separate default-off guide/click, cue/300ms/count-in, bar rewind, loops, AudioContext clock and cleanup. Chromium flows including second-bar resume/new-pitch cue passed. No microphone feedback yet. |
+| T08 | 已实现待验证 | Pitchy4.1.0, mono Worklet→Worker,4096/1024 actual-rate windows, quiet calibration, noise/clarity gating, median smoothing and explicit gaps. Non-isolated Chromium synthetic stream/permission denial/cleanup passed. Strong2nd harmonic octave failure recorded; real human/device validation pending. |
+| T09 | 已实现待验证 | Fixed-time comparison, strict octave/cents, time-weighted coverage/accuracy, bounded evidenced attacks, rests/gaps/rewind, optional pulse latency calibration/manual correction and result UI. Deterministic suite + actual synthetic mic UI passed. Physical/human/calibration acoustics pending; trial only. |
+| T10–T13 | 未开始 | No standalone mobile route, sharing or production deployment claim. |
 
-## Local practice gate
-Pending: known pitches/timing, uncertainty/coverage, real microphone and latency.
+Next: T10 lightweight standalone practice route and local practice package; then sharing service implementation. User has no Supabase project and asked to continue local work; production sharing is deferred, not mocked as live.
 
-## Physical devices and production
-Not run: iPhone Safari, Android Chrome, desktop audio, ten-minute session, Supabase production create/resolve/revoke. Requires actual access, not emulation.
+Input commit for new data code: 5765be25. Commands/results: see ACCEPTANCE. Changes are additive src/choir and public tests; no OMR edits or dependency upgrades. Original source metadata is kept; unsupported anchors or unresolved voice data block projection instead of being discarded.
 
-## 2026-11-06 implementation checkpoint
-- Runtime: Node22.23.4; npm ci completed using upstream lockfile. System Node26 baseline also built, but project checks rerun with Node22.
-- `node22 node_modules/typescript/bin/tsc --noEmit`: passed.
-- `node22 node_modules/vitest/vitest.mjs run`: 19/19 passed (13 mapping tests, 2 project serialization tests, 4 MusicXML writer/playback integration tests).
-- `node22 node_modules/vite/bin/vite.js build`: passed. Pre-existing opentype default-export and large-chunk warnings remain; no unrelated dependency updates made.
-- `node22 tests/browser/smoke.mjs`: passed in installed Chromium1248; imports handmade SATB MusicXML, renders original staff then existing single-part mixed view. This is desktop automation, not physical-device acceptance.
-- Mapping evidence: open/closed explicit lanes, sparse voice IDs, two staves/four voices, source immutability, unique derived IDs/provenance, stale/unconfirmed/missing mapping rejection, explicit chord-note allocation, duplicate/unison ownership, gap/key/lyrics/direction timing, octave clef, crossing voices, mark remap/cross-lane rejection, overlap rejection.
-- Serializer evidence: source/mapping/layout/local OMR bytes roundtrip; stale source revision rejected.
-- Not yet validated: full rhythm/repeat/tempo fixture matrix, malformed-file/resource-limit hardening, interactive setup/undo/draft recovery, derived layout, audio exports, microphone/scoring/sharing or any physical phone.
 
-Additional integration evidence: 3/4, 4/4 and 6/8 derived scores roundtrip through the actual MusicXML writer and playback source to independently specified MIDI pitches [72,69,64,48] and durations. Section anchors remap after source element IDs change. This does not yet verify tempo-map/repeat occurrences.
+No implementation, deployment or physical-device acceptance is claimed merely from this document.
 
-## 2026-11-06 T03/T04 checkpoint (c69242cc)
-- Node22 typecheck: passed. Unit suite: 38/38 passed (15 mapping, 4 project, 4 session, 9 tempo, 2 compiled performance, 4 XML semantics).
-- Browser: actual setup, four role confirmations, undo/redo, .dolcechoir download and reopen, IndexedDB recovery after reload, S-only edit invalidates S while A/T/B remain confirmed: passed in Chromium1248.
-- Timing: manually specified piecewise integration/inverse/speed; repeat target restores tempo; actual MusicXML repeat; later first tempo uses initial90; dotted-unit conversion; conflicts rejected; changing divisions and trailing silence; MIDI tempo tracks, selected part isolation and silent EOT: passed.
-- Not evidence of physical audio output, smartphone mic, production deployment or full upstream private regression.
+Commits: 5765be25 (execution/public-check foundation); 2163b2ec (mapping); a3099196 (project codec/browser baseline). Draft PR: https://github.com/Jiyu-666/dolce-choir/pull/1. Remote CI at a3099196 had passed install/typecheck/unit tests and was still building when observed; do not infer completion.
 
-## T05 local geometry/export evidence
-Node22: 39/39 tests, strict types and Vite production build passed. Chromium: four actual role labels/layers, mm/pt independent sizes, source immutability, synchronized chord x coordinates, actual freshly rendered ink agrees with pagination bounds, 4/8mm group clearances, 32-bar repagination from4 to6pages at12→24pt; PDF and PNG download signatures passed. Screenshots/exports under ignored out/browser. No physical print or mobile acceptance claimed.
+## 2026-11-06 continuation evidence
+Input: 78274dbc. Outputs: 89db4d52 (musical ownership fixes), 7f888388 (session/project/draft), 9347580d (unified timing), c69242cc (setup UI).
+Scope: choir modules, necessary playback/MIDI and editor hooks; no OMR rewrite or dependency upgrades.
+Checks actually run under Node22: typecheck passed; 38/38 unit tests passed; Chromium baseline and setup/undo/redo/save/reopen/draft/source-invalidation passed before T05 changes. Latest build and T05 browser checks are still in progress.
+Limits: no real microphone/phone/cloud verification, no complete v1 delivery claim.
 
-## T06 local audio evidence
-41/41 unit tests passed. Chromium actual ZIP download contains fourMP3/fourMIDI + licenses; MIDI onlytarget pitches[72,69,64,48], two tracks each including tempo track, GM piano program0. Short piano scale audible PCM peaks>0.01, decoded mono44.1kHz128kbps output;4s nominal→4.049s decoded. Silence2s→2.038s, peak0. A note straddling20s: chunked PCM exactly matched full render (max error0), including envelope/sample phase. Worker cancellation rejects AbortError. Ten-minute sparse sample:600.033s decoded,9,600,522bytes,about3.06s generation in desktopChromium. These are deterministic browser checks, not real phone listening or measured mobile RAM acceptance.
+T05 checks: 39 unit tests + Node22 typecheck/build passed; Chromium geometry and actual PDF/PNG downloads passed. The initial PDF test exposed a real CSS bug (absolute score SVG intercepted buttons); scoped choir SVG positioning fixed it, no forced-click bypass. Negative path-bound test runs in the browser because its real measurement backend is required.
 
-## T07 transport evidence
-43/43 unit tests (including compound6/8 and resumed3/4 tempo count-in) passed; strict typecheck passed. Actual Chromium AudioContext/browser UI passed: defaults off, cue/count-in, pause/resume same attempt, complete, independent piano/click, role restart, each loop new attempt, frozen cloned plan, duplicate start protection, rewind to second bar and load its different cue pitch, context closes on dispose. Rendering clock driven by AudioContext; animations only display. No real phone or microphone claimed.
+T06 input d02f2e5f. Scope: src/choir piano/audioexport/worker/vendor, solo serializer in existing MIDI module, setup export UI, locked lamejs1.2.1 + attribution. Checks: 41unit tests passed; strict types passed; browser exported actual ZIP with4MP3+4MIDI and checked target pitches72/69/64/48 independently. MP3 decoded mono44100Hz;4s nominal decoded4.049s;2s silence decoded2.038s peak0; chunk seam max error0 versus continuous rendering; cancellation rejected AbortError; ten-minute decoded600.033s,9,600,522bytes,~3.06s processing in desktop Chromium. Production build pending final completion when recorded. Limits:20s PCM blocks bounded by design; no measured mobile peak memory. Cancelling stops Worker immediately; a native OfflineAudioContext block already rendering finishes before its result is discarded. No further block is scheduled. No real audio-route audition claimed.
 
-## T08 deterministic/browser evidence
-Pitchy4.1.0:504stable synthetic windows across44.1/48kHz and65.4–1396.9Hz,allvalid/allwithin20c,max0.072cents. Silence/seededwhite-noise/isolatedimpact rejected; noisegate and window-center/gap tests passed. Strong second harmonic ratio8 returned octave-high (~+1200cents) in allfourstresscases; known limitation retained, no target-dependent folding. Non-isolated Chromium (Pages-like withoutSAB) actualWorklet/Worker/syntheticMediaStream: calibrationpassed,440Hzmax2.82c,medianpipeline lag42.7ms,congestiongapreported,permission-denial and track/worker cleanup passed. Synthetic stream is NOT physical microphone/device/human validation.
+T07 input c1c57d47. Scope: choir transport/practice view, meter/beat metadata in shared plan, time-offset support in shared piano scheduler, entry/i18n/tests. 43unit tests + strict types passed; Chromium actual AudioContext: count-in/pause/resume/completion/defaults/guide+click/role restart, fresh loop attempts, immutable target and duplicate-start protection, second-bar rewind/new note cue, context closed on disposal. No microphone/real-phone claim. T06 production build succeeded at c1c57d47.
 
-## Supplemental T04 timing regression
-Added handwritten XML for first/second endings, D.C.alFine, D.S.alCoda, pickup/tie anchors, changed divisions + leading/trailing forward gaps + direction offsets. The changed-divisions case reproduced an upstream defect: phrase/jump adapters still used the first divisions and ignored explicit onset/trailing duration. Minimal fix updates active divisions and explicit cursor/duration; all68current tests passed afterwards. The new tie test's initial rest-anchor expectation was corrected: rests are not sung-onset anchors; both written tied notes remain separate anchors while sounding as one sustained note. No pre-existing assertion weakened.
+T08 input216cce2c. Scope: pitch/capture worker/microphone modules and optional prepare hook/practice controls; locked Pitchy4.1.0/fft.js. Tests:48unit (43prior+5pitch) passed; strict types passed; Chromium non-isolated page (crossOriginIsolated=false) actualWorklet→Worker with synthetic MediaStream: calibrationnoiseRMS0,8voiced frames440Hz max2.82cents,mediananalysislag42.7ms,17explicit dropped-block gaps after700ms main-thread congestion, permission-denial rejected and alltracks stopped/no furtherframes afterabort. Known stable pure/moderateharmonic grid:504/504 within20c,max0.072cents. Strong second-harmonic ratio8: detector returns+1200cents onfourfrequencies; recorded, never corrected toward target. No generic human accuracy claim. Real microphone permissions, acoustics, iPhone/Android and feedbacklatency remain unverified.
+
+T09 inpute6b5d723 (+T04 regressionfix f486e9b8). Scope: choir comparison/result/latency, practice UI integration, explicit microphone-tail timing, source-revision invalidation. 70unit tests + strict types passed; Chromium synthetic microphone UI showed correct, octave-high and sparse coverage cases; reported100%coverage/0%pitch for octave-high,100%/100% for correct,18%coverage with no whole-range conclusion for sparse. Optional automatic pulse calibration implementation and pure estimator tests exist; real acoustic path calibration remains unverified. No human accuracy or phone claim.
+Music-gate supplement: inherited jump/phrase active-divisions bug fixed after repro. Handwritten pickups/ties/voltas/DC/DS/Coda timing passed. Unknown jump destinations, conflicting control marks, navigation words without sound semantics and repeat counts other than2 block target generation; these unsupported scores require maintainer correction. This is fail-closed diagnostic support, not a claim of complete support for all navigation.
+Outputs already committed: T05d02f2e5f, T06c1c57d47, T07216cce2c, T08e6b5d723, T04supplementf486e9b8. Last remote pushc1c57d47; newer work will be pushed after T09 verification checkpoint.

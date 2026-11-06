@@ -38,7 +38,7 @@ export function playDataOfDoc(song: Song, { lead = 0, distinct = false, useSecti
   let div = 1;
   part.measures.forEach((m, mid) => {
     if (m.attrs?.divisions) div = m.attrs.divisions;
-    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, cursorAt(m, d).plus(new Fraction(d.offset ?? 0)).divInt(div)));
+    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, directionBeat(m,d,div)));
   });
   const view = phrasePartOfDoc(song, lead, distinct);
   // 逐遍演唱顺序（123 `%%sing`）：逐页逐行写定的，优先于 `.Repeat`、`P:` 与谱面记号
@@ -115,6 +115,10 @@ function cursorAt(m: Measure, d: Direction): Fraction {
     pos.set(el.voice, end);
   }
   return new Fraction(end);
+}
+/** Shared source-direction position; playback controls and numeric tempi use the same cursor. */
+export function directionBeat(m: Measure, direction: Direction, divisions: number): Fraction {
+  return cursorAt(m,direction).plus(new Fraction(direction.offset ?? 0)).divInt(divisions);
 }
 
 /** 同 `parseSound`（速度除外）。 */
@@ -203,7 +207,7 @@ export function tempoEventsOfDoc(song: Song): { measure: number; beat: number; b
         const bpm = d.sound?.tempo ?? (d.tempo?.perMinute !== undefined ? d.tempo.perMinute*(units[d.tempo.beatUnit ?? "quarter"] ?? 1)*(d.tempo.beatUnitDot ? 1.5 : 1) : undefined);
         if (bpm === undefined) continue;
         if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("Invalid numeric tempo");
-        const beat = (cursorAt(m,d).toFloat()+(d.offset ?? 0))/div;
+        const beat = directionBeat(m,d,div).toFloat();
         if (beat < 0) throw new Error("Negative tempo position");
         const key = `${measure}:${beat}`, previous = events.get(key);
         if (previous && Math.abs(previous.bpm-bpm)>1e-6) throw new Error(`Conflicting tempo at measure ${measure+1}, beat ${beat}`);

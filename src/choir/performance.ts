@@ -3,6 +3,7 @@ import { playSourceOfDoc } from "../model/playdoc";
 import { buildTimeline, playTempo } from "../score/timeline";
 import { TempoClock, type TempoPoint } from "../score/tempo";
 import { ROLES, type ChoirRole } from "./mapping";
+import { validateChoirControls } from "./musicgate";
 
 export interface PerformanceOptions {
   role: ChoirRole;
@@ -28,6 +29,7 @@ export function compilePerformance(doc: ScoreDoc, revision: string, options: Per
   if (!song || doc.songs.length !== 1 || part < 0 || song.parts.length !== 4) throw new Error("Expected normalized SATB score");
   const speed = options.speed ?? 1, octave = options.octave ?? 0;
   if (!Number.isFinite(speed) || speed < .25 || speed > 3 || ![-1,0,1].includes(octave)) throw new Error("Invalid practice settings");
+  validateChoirControls(song);
   const src = playSourceOfDoc(song), tl = buildTimeline(src);
   const first = options.fromOccurrence ?? 0, last = options.toOccurrence ?? tl.occurrences.length-1;
   if (!Number.isInteger(first) || !Number.isInteger(last) || first < 0 || last < first || !tl.occurrences[last]) throw new Error("Invalid practice measure range");
@@ -51,6 +53,6 @@ export function compilePerformance(doc: ScoreDoc, revision: string, options: Per
     anchors:tl.allAnchors.filter(a=>a.t0>=from && a.t0<to && a.chord.id!==undefined && ids.has(a.chord.id)).map(a=>({elementId:a.chord.id,pass:a.pass,occurrence:a.occ??0,seconds:sec(a.t0)})),
     measures:tl.occurrences.slice(first,last+1).map(m=>({measure:m.measure,occurrence:m.occurrence,pass:m.pass,startBeat:m.t0-from,endBeat:m.t1-from,time:{...src.parts[part].measures[m.measure]!.time},startSeconds:sec(m.t0),endSeconds:sec(m.t1)})),
     clicks:tl.clicks.filter(c=>c.t>=from&&c.t<to).map(c=>({seconds:sec(c.t),down:c.down})),
-    assumedInitialTempo:!src.tempoEvents?.some(t=>t.measure===0&&t.beat===0),
+    assumedInitialTempo:!src.tempoEvents?.some(t=>t.measure<tl.occurrences[first].measure||t.measure===tl.occurrences[first].measure&&t.beat<=tl.occurrences[first].sourceFrom),
   };
 }
