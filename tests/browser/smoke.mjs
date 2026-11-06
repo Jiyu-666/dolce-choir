@@ -1,6 +1,8 @@
+import { unzipSync } from 'fflate';
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { verifyAudioExport } from './audio-export.mjs';
 import { verifyChoirLayout } from './choir-layout.mjs';
 import { spawn } from 'node:child_process';
 const server = spawn(process.execPath, ['node_modules/vite/bin/vite.js', '--host', '127.0.0.1'], { stdio: ['ignore','pipe','pipe'] });
@@ -37,6 +39,18 @@ try {
   assert.equal(await page.locator('.choir-role').count(), 4);
   for (const role of ['S','A','T','B']) await page.locator(`.choir-role[data-role="${role}"] input[type=checkbox]`).first().check();
   assert.equal(await page.locator('[data-testid="choir-issues"]').count(),0);
+  const tracksEvent = page.waitForEvent('download', {timeout:60000}); tracksEvent.catch(() => {});
+  await page.locator('[data-testid="choir-tracks"]').click();
+  const tracks = await tracksEvent; await mkdir('out/browser',{recursive:true}); await tracks.saveAs('out/browser/satb-tracks.zip');
+  const files = unzipSync(new Uint8Array(await readFile(await tracks.path())));
+  assert.equal(Object.keys(files).filter(n=>n.endsWith('.mp3')).length,4);
+  assert.equal(Object.keys(files).filter(n=>n.endsWith('.mid')).length,4);
+  for (const [i,role] of ['S','A','T','B'].entries()) {
+    const mid = files[Object.keys(files).find(n=>n.includes(`－${role}`)&&n.endsWith('.mid'))];
+    assert.equal((mid[10]<<8)|mid[11],2);
+    const pitches = [...mid].flatMap((v,k)=>v===0x90 ? [mid[k+1]] : []);
+    assert.deepEqual(pitches,[[72],[69],[64],[48]][i]);
+  }
   await page.locator('[data-testid="choir-preview"]').click();
   await page.locator('.choir-preview svg').first().waitFor();
   assert.equal(await page.locator('.choir-preview svg text').filter({hasText:/^[SATB]$/}).count(), 4);
@@ -60,6 +74,7 @@ try {
   await redo.click(); assert.equal(await name.inputValue(), 'Soprano test');
   const downloadPromise = page.waitForEvent('download'); await page.locator('.choir-actions button').nth(3).click();
   const download = await downloadPromise; assert(download.suggestedFilename().endsWith('.dolcechoir'));
+  await download.saveAs("out/browser/satb.dolcechoir");
   const projectPath = await download.path();
   await name.fill("Changed after save"); await name.press("Tab");
   await page.locator('.choir-actions input[type=file]').setInputFiles(projectPath);
@@ -73,6 +88,7 @@ try {
   await page.waitForFunction(() => { const box=document.querySelector('.choir-role[data-role="S"] input[type=checkbox]'); return box && !box.checked; });
   for (const role of ['A','T','B']) assert(await page.locator(`.choir-role[data-role="${role}"] input[type=checkbox]`).first().isChecked());
   await verifyChoirLayout(page);
+  await verifyAudioExport(page);
   await mkdir('out/browser', {recursive:true}); await page.screenshot({path:'out/browser/choir-setup.png',fullPage:true});
   console.log('PASS: staff/mixed baseline + SATB setup/confirmation/undo/redo/project roundtrip/draft recovery/source invalidation');
 } finally {

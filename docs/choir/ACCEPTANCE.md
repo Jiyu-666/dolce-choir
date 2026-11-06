@@ -32,3 +32,6 @@ Additional integration evidence: 3/4, 4/4 and 6/8 derived scores roundtrip throu
 
 ## T05 local geometry/export evidence
 Node22: 39/39 tests, strict types and Vite production build passed. Chromium: four actual role labels/layers, mm/pt independent sizes, source immutability, synchronized chord x coordinates, actual freshly rendered ink agrees with pagination bounds, 4/8mm group clearances, 32-bar repagination from4 to6pages at12→24pt; PDF and PNG download signatures passed. Screenshots/exports under ignored out/browser. No physical print or mobile acceptance claimed.
+
+## T06 local audio evidence
+41/41 unit tests passed. Chromium actual ZIP download contains fourMP3/fourMIDI + licenses; MIDI onlytarget pitches[72,69,64,48], two tracks each including tempo track, GM piano program0. Short piano scale audible PCM peaks>0.01, decoded mono44.1kHz128kbps output;4s nominal→4.049s decoded. Silence2s→2.038s, peak0. A note straddling20s: chunked PCM exactly matched full render (max error0), including envelope/sample phase. Worker cancellation rejects AbortError. Ten-minute sparse sample:600.033s decoded,9,600,522bytes,about3.06s generation in desktopChromium. These are deterministic browser checks, not real phone listening or measured mobile RAM acceptance.

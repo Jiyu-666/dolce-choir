@@ -39,6 +39,27 @@ function trackChunk(events: Ev[], endTick = 0): number[] {
 
 const utf8 = new TextEncoder();
 
+/** Serialize a compiled solo plan directly: no second pass through repeat/pitch inference. */
+export function soloPianoMidi(plan: {
+  durationBeats: number; speed: number; tempos: { t: number; bpm: number }[];
+  notes: { startBeat: number; endBeat: number; pitch: number; velocity: number }[];
+}, name: string): Uint8Array {
+  const events: Ev[] = [
+    { tick: 0, order: -2, data: metaText(0x03, name) },
+    { tick: 0, order: -1, data: [0xc0, 0] }, // GM acoustic grand piano, channel1
+  ];
+  for (const note of plan.notes) {
+    if (!Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) throw new Error("MIDI pitch out of range");
+    events.push({ tick: Math.round(note.startBeat * PPQ), order: 2, data: [0x90, note.pitch, note.velocity] });
+    events.push({ tick: Math.round(note.endBeat * PPQ), order: 0, data: [0x80, note.pitch, 0] });
+  }
+  return new Uint8Array([
+    0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, PPQ >> 8, PPQ & 255,
+    ...tempoTrack(plan.tempos, 90, plan.speed, plan.durationBeats),
+    ...trackChunk(events, Math.round(plan.durationBeats * PPQ)),
+  ]);
+}
+
 /** 文字类元事件（`FF type len text`），文本按 UTF-8 写（中文歌词各家歌声合成软件都这么认）。 */
 function metaText(type: number, text: string): number[] {
   const bytes = Array.from(utf8.encode(text));

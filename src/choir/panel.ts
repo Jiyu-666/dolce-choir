@@ -46,6 +46,8 @@ class ChoirPanel {
   private restoring = false;
   private message = "";
   private openedDraft = false;
+  private audioJob: AbortController | null = null;
+  private audioProgress = "";
   private previewGeneration = 0;
   private preview: ScorePainter | null = null;
   private hidden = new Set<number>();
@@ -54,7 +56,7 @@ class ChoirPanel {
     app.choirSourceChanged = (newDocument) => {
       if (this.restoring) return;
       if (newDocument) this.session.clear();
-      this.previewGeneration++; this.preview = null; this.player.stop(); this.syncing = true; this.sourceValid = false; this.render();
+      this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.player.stop(); this.syncing = true; this.sourceValid = false; this.render();
       clearTimeout(this.timer);
       this.timer = setTimeout(() => void this.sync(), 250);
     };
@@ -80,7 +82,7 @@ class ChoirPanel {
     this.body = element("div"); this.body.className = "choir-panel";
     const done = button(t("parts.done"), () => this.close?.());
     const modal = openModal({ title: t("choir.title"), boxClass: "choir-box", body: [this.body], footer: [done], onClose: () => {
-      this.player.stop(); this.body = null; this.close = null;
+      this.audioJob?.abort(); this.player.stop(); this.body = null; this.close = null;
     } });
     this.close = modal.close; this.render();
     if (!this.openedDraft) {
@@ -96,7 +98,7 @@ class ChoirPanel {
   }
   private edit(change: Parameters<ChoirSession["edit"]>[0]): void {
     if (this.syncing || !this.sourceValid) return;
-    this.previewGeneration++; this.preview = null; this.player.stop(); this.session.edit(change); this.render(); this.draft();
+    this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.player.stop(); this.session.edit(change); this.render(); this.draft();
   }
   private snapshot(): ChoirProject {
     const p = this.session.project;
@@ -112,8 +114,8 @@ class ChoirPanel {
       await saveChoirDraft(packChoirProject(this.snapshot()));
     }, t("choir.draftSaved"), false), 800);
   }
-  private async run(action: () => Promise<void>, success = "", repaint = true): Promise<void> {
-    try { await action(); this.message = success; }
+  private async run(action: () => Promise<void>, success?: string, repaint = true): Promise<void> {
+    try { this.message = ""; await action(); if (success !== undefined) this.message = success; }
     catch (error) { console.error("Choir operation failed", error); this.message = t("choir.failed"); }
     if (repaint) this.render();
     else { const status = this.body?.querySelector("[role=status]"); if (status) status.textContent = this.message; }
@@ -131,7 +133,7 @@ class ChoirPanel {
         const ext = p.editorSource.format === "fanqie" ? "txt" : p.editorSource.format === "jly" ? "jly" : p.editorSource.format;
         this.app.importBytes(format.encode(p.editorSource.text), `source.${ext}`);
       } else this.app.importBytes(new TextEncoder().encode(p.sourceXml), "source.musicxml");
-      this.previewGeneration++; this.preview = null; this.session.restore(p);
+      this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.session.restore(p);
     } finally { this.restoring = false; }
     this.sourceValid = true; this.syncing = false; this.draft();
   }
@@ -147,13 +149,31 @@ class ChoirPanel {
     const part = ROLES.indexOf(role);
     await this.player.play(src, { selectedParts: [part] });
   }
+  private async tracks(): Promise<void> {
+    if (this.audioJob) return;
+    const p = this.snapshot(), result = this.session.projection;
+    if (!result?.doc) throw new Error("Unconfirmed mapping");
+    const controller = new AbortController(); this.audioJob = controller; this.render();
+    try {
+      const { exportTracks } = await import("./audioexport");
+      const bytes = await exportTracks(result.doc, p.mapping.revision, this.app.documentTitle(), controller.signal, progress => {
+        this.audioProgress = t("choir.audioProgress", { role: progress.role, stage: t(`choir.audio.${progress.stage}`), percent: Math.round(progress.fraction * 100) });
+        const status = this.body?.querySelector("[data-testid=audio-progress]"); if (status) status.textContent = this.audioProgress;
+      });
+      controller.signal.throwIfAborted(); await saveBytes(bytes, `${this.app.documentTitle()}-SATB.zip`, "application/zip");
+      this.message = t("choir.audioDone");
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
+      this.message = t("choir.audioCancelled");
+    } finally { this.audioJob = null; this.audioProgress = ""; this.render(); }
+  }
   private render(): void {
     const body = this.body; if (!body) return;
     body.replaceChildren();
     const project = this.session.project;
     const tools = element("div"); tools.className = "choir-actions";
-    const undo = button(t("choir.undo"), () => { this.previewGeneration++; this.preview = null; this.session.undo(); this.render(); this.draft(); }); undo.disabled = !this.session.canUndo || this.syncing || !this.sourceValid;
-    const redo = button(t("choir.redo"), () => { this.previewGeneration++; this.preview = null; this.session.redo(); this.render(); this.draft(); }); redo.disabled = !this.session.canRedo || this.syncing || !this.sourceValid;
+    const undo = button(t("choir.undo"), () => { this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.session.undo(); this.render(); this.draft(); }); undo.disabled = !this.session.canUndo || this.syncing || !this.sourceValid;
+    const redo = button(t("choir.redo"), () => { this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.session.redo(); this.render(); this.draft(); }); redo.disabled = !this.session.canRedo || this.syncing || !this.sourceValid;
     const open = element("input"); open.type = "file"; open.accept = ".dolcechoir"; open.hidden = true;
     open.addEventListener("change", () => { const f = open.files?.[0]; if (f) void this.run(async () => this.restore(new Uint8Array(await f.arrayBuffer()))); });
     const save = button(t("choir.save"), () => void this.run(async () => { const bytes = packChoirProject(this.snapshot()); await saveBytes(bytes, `${this.app.documentTitle() || "choir"}.dolcechoir`); }));
@@ -202,6 +222,11 @@ class ChoirPanel {
     const list = element("ul"); list.dataset.testid = "choir-issues";
     for (const issue of issues) list.append(element("li", `${issue.role ?? ""} ${issue.measure !== undefined ? t("choir.measure", { n: issue.measure + 1 }) : ""} ${t(issueKeys[issue.code])}`));
     body.append(issues.length ? list : element("p", t("choir.ready")));
+    const tracks = button(t("choir.exportTracks"), () => void this.run(() => this.tracks()));
+    tracks.disabled = !!this.audioJob || issues.length > 0; tracks.dataset.testid = "choir-tracks";
+    const cancel = button(t("choir.cancelExport"), () => this.audioJob?.abort()); cancel.disabled = !this.audioJob;
+    const progress = element("p", this.audioProgress); progress.dataset.testid = "audio-progress"; progress.setAttribute("role", "status");
+    body.append(tracks, cancel, progress);
     const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
     const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;
     for (const key of ["staffMm", "jianpuPt", "layerGapMm", "groupGapMm"] as const) {
@@ -213,7 +238,7 @@ class ChoirPanel {
     }
     for (const [i, role] of ROLES.entries()) {
       const check = element("input"); check.type = "checkbox"; check.checked = !this.hidden.has(i);
-      check.addEventListener("change", () => { if (check.checked) this.hidden.delete(i); else this.hidden.add(i); this.previewGeneration++; this.preview = null; this.render(); });
+      check.addEventListener("change", () => { if (check.checked) this.hidden.delete(i); else this.hidden.add(i); this.audioJob?.abort(); this.previewGeneration++; this.preview = null; this.render(); });
       const label = element("label", t(`choir.role.${role}`)); label.prepend(check); layout.append(label);
     }
     const show = button(t("choir.preview"), () => void this.run(async () => {
