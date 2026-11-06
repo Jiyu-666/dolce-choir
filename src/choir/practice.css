@@ -1,0 +1,10 @@
+.practice-box { width: min(760px, 96vw); }
+.practice-view { max-height: 78vh; overflow: auto; padding: 8px; }
+.practice-roles, .practice-controls, .practice-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.practice-controls { margin-top: 12px; }
+.practice-controls label { display: flex; gap: 6px; align-items: center; }
+.practice-controls input[type=number] { width: 65px; }
+.practice-view button, .practice-view input, .practice-view select { min-height: 40px; }
+.practice-roles button[aria-pressed=true] { outline: 2px solid #489ee8; }
+.practice-actions { position: sticky; top: 0; padding: 8px 0; background: var(--panel, #222); z-index: 1; }
+.practice-score svg { position: relative; inset: auto; display: block; width: 100%; height: auto; background: white; margin-top: 12px; }

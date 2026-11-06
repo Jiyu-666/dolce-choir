@@ -35,3 +35,6 @@ Node22: 39/39 tests, strict types and Vite production build passed. Chromium: fo
 
 ## T06 local audio evidence
 41/41 unit tests passed. Chromium actual ZIP download contains fourMP3/fourMIDI + licenses; MIDI onlytarget pitches[72,69,64,48], two tracks each including tempo track, GM piano program0. Short piano scale audible PCM peaks>0.01, decoded mono44.1kHz128kbps output;4s nominal→4.049s decoded. Silence2s→2.038s, peak0. A note straddling20s: chunked PCM exactly matched full render (max error0), including envelope/sample phase. Worker cancellation rejects AbortError. Ten-minute sparse sample:600.033s decoded,9,600,522bytes,about3.06s generation in desktopChromium. These are deterministic browser checks, not real phone listening or measured mobile RAM acceptance.
+
+## T07 transport evidence
+43/43 unit tests (including compound6/8 and resumed3/4 tempo count-in) passed; strict typecheck passed. Actual Chromium AudioContext/browser UI passed: defaults off, cue/count-in, pause/resume same attempt, complete, independent piano/click, role restart, each loop new attempt, frozen cloned plan, duplicate start protection, rewind to second bar and load its different cue pitch, context closes on dispose. Rendering clock driven by AudioContext; animations only display. No real phone or microphone claimed.

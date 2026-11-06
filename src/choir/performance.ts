@@ -17,7 +17,7 @@ export interface PerformancePlan {
   durationBeats: number; durationSeconds: number; tempos: TempoPoint[];
   notes: { key: string; elementId: number | undefined; pitch: number; velocity: number; startBeat: number; endBeat: number; startSeconds: number; endSeconds: number }[];
   anchors: { elementId: number | undefined; pass: number; occurrence: number; seconds: number }[];
-  measures: { measure: number; occurrence: number; pass: number; startSeconds: number; endSeconds: number }[];
+  measures: { measure: number; occurrence: number; pass: number; startBeat: number; endBeat: number; time: { beats: number; beatType: number }; startSeconds: number; endSeconds: number }[];
   clicks: { seconds: number; down: boolean }[];
   rests: { startSeconds: number; endSeconds: number }[];
   assumedInitialTempo: boolean;
@@ -49,7 +49,7 @@ export function compilePerformance(doc: ScoreDoc, revision: string, options: Per
   const ids = new Set(song.parts[part].measures.flatMap(m=>m.elements.map(e=>e.id)));
   return {version:1,revision,role:options.role,speed,octave,durationBeats:to-from,durationSeconds,tempos,notes,rests,
     anchors:tl.allAnchors.filter(a=>a.t0>=from && a.t0<to && a.chord.id!==undefined && ids.has(a.chord.id)).map(a=>({elementId:a.chord.id,pass:a.pass,occurrence:a.occ??0,seconds:sec(a.t0)})),
-    measures:tl.occurrences.slice(first,last+1).map(m=>({measure:m.measure,occurrence:m.occurrence,pass:m.pass,startSeconds:sec(m.t0),endSeconds:sec(m.t1)})),
+    measures:tl.occurrences.slice(first,last+1).map(m=>({measure:m.measure,occurrence:m.occurrence,pass:m.pass,startBeat:m.t0-from,endBeat:m.t1-from,time:{...src.parts[part].measures[m.measure]!.time},startSeconds:sec(m.t0),endSeconds:sec(m.t1)})),
     clicks:tl.clicks.filter(c=>c.t>=from&&c.t<to).map(c=>({seconds:sec(c.t),down:c.down})),
     assumedInitialTempo:!src.tempoEvents?.some(t=>t.measure===0&&t.beat===0),
   };

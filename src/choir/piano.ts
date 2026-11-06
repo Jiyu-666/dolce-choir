@@ -42,17 +42,17 @@ function envelope(age: number, duration: number): number {
   return Math.max(0, Math.min(1, age / ATTACK, (duration + RELEASE - age) / RELEASE));
 }
 /** Shared sampled-note scheduler. Offset preserves original sample position and envelope across blocks. */
-export function schedulePianoNote(ctx: BaseAudioContext, destination: AudioNode, buffer: AudioBuffer, note: { startSeconds: number; endSeconds: number; velocity: number }, from: number, to: number): AudioBufferSourceNode | null {
+export function schedulePianoNote(ctx: BaseAudioContext, destination: AudioNode, buffer: AudioBuffer, note: { startSeconds: number; endSeconds: number; velocity: number }, from: number, to: number, timeBase = 0): AudioBufferSourceNode | null {
   const start = Math.max(from, note.startSeconds), end = Math.min(to, note.endSeconds + RELEASE, note.startSeconds + buffer.duration);
   if (end <= start) return null;
   const src = ctx.createBufferSource(), amp = ctx.createGain(); src.buffer = buffer; src.connect(amp); amp.connect(destination);
   const age = start - note.startSeconds, duration = note.endSeconds - note.startSeconds, gain = LEVEL * note.velocity / 127;
-  amp.gain.setValueAtTime(envelope(age, duration) * gain, start - from);
-  if (age < Math.min(ATTACK, duration)) amp.gain.linearRampToValueAtTime(gain * envelope(Math.min(ATTACK, duration), duration), note.startSeconds + Math.min(ATTACK, duration) - from);
-  if (note.endSeconds > start && note.endSeconds < to) amp.gain.setValueAtTime(gain, note.endSeconds - from);
-  if (note.endSeconds + RELEASE > start && note.endSeconds + RELEASE <= to) amp.gain.linearRampToValueAtTime(0, note.endSeconds + RELEASE - from);
-  else if (end > note.endSeconds) amp.gain.linearRampToValueAtTime(envelope(end - note.startSeconds, duration) * gain, end - from);
-  src.start(start - from, age, end - start);
+  amp.gain.setValueAtTime(envelope(age, duration) * gain, timeBase + start - from);
+  if (age < Math.min(ATTACK, duration)) amp.gain.linearRampToValueAtTime(gain * envelope(Math.min(ATTACK, duration), duration), note.startSeconds + Math.min(ATTACK, duration) - from + timeBase);
+  if (note.endSeconds > start && note.endSeconds < to) amp.gain.setValueAtTime(gain, note.endSeconds - from + timeBase);
+  if (note.endSeconds + RELEASE > start && note.endSeconds + RELEASE <= to) amp.gain.linearRampToValueAtTime(0, note.endSeconds + RELEASE - from + timeBase);
+  else if (end > note.endSeconds) amp.gain.linearRampToValueAtTime(envelope(end - note.startSeconds, duration) * gain, end - from + timeBase);
+  src.start(timeBase + start - from, age, end - start);
   return src;
 }
 /** Frame-aligned independent blocks with continuous sample age and release envelopes. */

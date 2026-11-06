@@ -226,7 +226,14 @@ class ChoirPanel {
     tracks.disabled = !!this.audioJob || issues.length > 0; tracks.dataset.testid = "choir-tracks";
     const cancel = button(t("choir.cancelExport"), () => this.audioJob?.abort()); cancel.disabled = !this.audioJob;
     const progress = element("p", this.audioProgress); progress.dataset.testid = "audio-progress"; progress.setAttribute("role", "status");
-    body.append(tracks, cancel, progress);
+    const practice = button(t("practice.title"), () => void this.run(async () => {
+      const p = this.snapshot(), result = this.session.projection;
+      if (!result?.doc) throw new Error("Unconfirmed mapping");
+      const { showPractice } = await import("./practice");
+      this.close?.(); showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources);
+    }));
+    practice.disabled = issues.length > 0; practice.dataset.testid = "choir-practice";
+    body.append(tracks, cancel, progress, practice);
     const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
     const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;
     for (const key of ["staffMm", "jianpuPt", "layerGapMm", "groupGapMm"] as const) {
