@@ -109,3 +109,18 @@ it('preserves a two-note chord only after both tones are explicitly allocated',(
   mapping.bindings[1].notes=[{measure:0,entry:0,signature:chordSignature(c),noteIndex:1}];
   expect(projectChoir(doc,mapping,'r1').issues).toEqual([]);
 });
+
+it('does not attach one chord tone’s slur to the other allocated melody',()=>{
+ const {doc,mapping}=setup();const m=doc.songs[0].parts[0].measures[0], c=m.elements[0] as Chord;
+ c.duration.divisions=2;c.notes.push({pitch:{step:'A',octave:4,alter:0}});
+ const second=structuredClone(c);second.id=100;second.onset=2;m.elements.push(second);
+ Object.assign(mapping.bindings[1],enumerateLanes(doc)[0]);
+ for(const [i,b] of mapping.bindings.entries()) if(i<2) b.notes=[c,second].map((n,entry)=>({measure:0,entry,signature:chordSignature(n),noteIndex:i}));
+ doc.songs[0].marks=[{type:'slur',start:c.id,end:100,startNote:0,endNote:0}];
+ const r=projectChoir(doc,mapping,'r1');expect(r.issues).toEqual([]);expect(r.doc!.songs[0].marks).toHaveLength(1);
+});
+it('rejects unpitched parts as vocal melodies',()=>{
+ const {doc,mapping}=setup();const c=doc.songs[0].parts[0].measures[0].elements[0] as Chord;
+ delete c.notes[0].pitch;delete c.notes[0].degree;
+ expect(projectChoir(doc,mapping,'r1').issues.map(i=>i.code)).toContain('unsupported');
+});

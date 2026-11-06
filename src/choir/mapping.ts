@@ -138,6 +138,7 @@ export function projectChoir(source: ScoreDoc, mapping: ChoirMapping, revision: 
           const key = `${original.id}/${mi}/${ei}/${ni}`, owner = owners.get(key);
           if (owner && !(owner.allowUnison && binding.allowUnison)) issues.push({ code: "duplicate", role, measure: mi, entry: ei });
           owners.set(key, binding); c.notes = [c.notes[ni]];
+          if (!c.notes[0]?.pitch) issues.push({ code: "unsupported", role, measure: mi, entry: ei });
         }
         if (!e.grace) end = Math.max(end, starts[ei] + e.duration.divisions);
         idMap.set(e.id, { id: c.id, noteIndex: ni });
@@ -168,7 +169,9 @@ export function projectChoir(source: ScoreDoc, mapping: ChoirMapping, revision: 
       const a = ids.get(mark.start), b = ids.get(mark.end);
       if (!a && !b) continue;
       if (!a || !b) { issues.push({ code: "mark", role }); continue; }
-      if ((mark.startNote ?? 0) !== a.noteIndex || (mark.endNote ?? 0) !== b.noteIndex) {
+      const ownsStart = (mark.startNote ?? 0) === a.noteIndex, ownsEnd = (mark.endNote ?? 0) === b.noteIndex;
+      if (!ownsStart && !ownsEnd) continue;
+      if (!ownsStart || !ownsEnd) {
         issues.push({ code: "mark", role }); continue;
       }
       out.marks.push({ ...structuredClone(mark), start: a.id, end: b.id, startNote: 0, endNote: 0 });
