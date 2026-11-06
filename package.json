@@ -59,6 +59,7 @@
     "opencc-js": "^1.4.2",
     "opentype.js": "^2.0.0",
     "pdfjs-dist": "^6.4.299",
+    "pitchy": "4.1.0",
     "sharp": "^0.35.5",
     "smplr": "^1.1.0"
   },

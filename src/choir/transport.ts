@@ -5,6 +5,7 @@ import type { PerformancePlan } from "./performance";
 export type PracticeState = "ready" | "loading" | "count-in" | "practicing" | "paused" | "completed" | "error";
 export interface TransportSettings { piano: boolean; metronome: boolean; loop: boolean }
 export interface PracticeCallbacks {
+  prepare?: (context: AudioContext, signal: AbortSignal) => Promise<void>;
   state: (state: PracticeState, error?: unknown) => void;
   tick: (seconds: number, count: number | null) => void;
   attempt: (number: number) => void;
@@ -69,6 +70,7 @@ export class PracticeTransport {
     try {
       this.ctx ??= new AudioContext(); this.ctx.addEventListener("statechange", this.contextChanged);
       await this.ctx.resume();
+      await this.callbacks.prepare?.(this.ctx, controller.signal);
       const first = plan.notes.find(n => n.endSeconds > this.resumeAt);
       const required = this.settings.piano ? plan.notes.map(n => n.pitch) : first ? [first.pitch] : [];
       const missing = required.filter(pitch => !this.samples?.has(pitch));

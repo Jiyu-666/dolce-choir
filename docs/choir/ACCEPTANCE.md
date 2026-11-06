@@ -38,3 +38,6 @@ Node22: 39/39 tests, strict types and Vite production build passed. Chromium: fo
 
 ## T07 transport evidence
 43/43 unit tests (including compound6/8 and resumed3/4 tempo count-in) passed; strict typecheck passed. Actual Chromium AudioContext/browser UI passed: defaults off, cue/count-in, pause/resume same attempt, complete, independent piano/click, role restart, each loop new attempt, frozen cloned plan, duplicate start protection, rewind to second bar and load its different cue pitch, context closes on dispose. Rendering clock driven by AudioContext; animations only display. No real phone or microphone claimed.
+
+## T08 deterministic/browser evidence
+Pitchy4.1.0:504stable synthetic windows across44.1/48kHz and65.4–1396.9Hz,allvalid/allwithin20c,max0.072cents. Silence/seededwhite-noise/isolatedimpact rejected; noisegate and window-center/gap tests passed. Strong second harmonic ratio8 returned octave-high (~+1200cents) in allfourstresscases; known limitation retained, no target-dependent folding. Non-isolated Chromium (Pages-like withoutSAB) actualWorklet/Worker/syntheticMediaStream: calibrationpassed,440Hzmax2.82c,medianpipeline lag42.7ms,congestiongapreported,permission-denial and track/worker cleanup passed. Synthetic stream is NOT physical microphone/device/human validation.

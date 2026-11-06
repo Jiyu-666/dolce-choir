@@ -2,6 +2,7 @@ import { unzipSync } from 'fflate';
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { verifyMicrophone } from './microphone.mjs';
 import { verifyTransport } from './transport.mjs';
 import { verifyAudioExport } from './audio-export.mjs';
 import { verifyChoirLayout } from './choir-layout.mjs';
@@ -92,6 +93,7 @@ try {
   await page.locator('[data-testid="choir-practice"]').click();
   await page.locator('.practice-score svg').first().waitFor();
   assert.equal(await page.locator('.practice-roles button').count(),4);
+  await page.locator('[data-testid="practice-microphone"]').uncheck();
   assert(!(await page.locator('[data-testid="practice-piano"]').isChecked()));
   assert(!(await page.locator('[data-testid="practice-metronome"]').isChecked()));
   await page.locator('[data-testid="practice-speed"]').fill('3'); await page.locator('[data-testid="practice-speed"]').press('Tab');
@@ -117,6 +119,7 @@ try {
   console.log('PASS: practice defaults, count-in, pause/resume, completion, independent guide/click and role restart');
   await verifyChoirLayout(page);
   await verifyAudioExport(page);
+  await verifyMicrophone(browser);
   await mkdir('out/browser', {recursive:true}); await page.screenshot({path:'out/browser/choir-setup.png',fullPage:true});
   console.log('PASS: staff/mixed baseline + SATB setup/confirmation/undo/redo/project roundtrip/draft recovery/source invalidation');
 } finally {
