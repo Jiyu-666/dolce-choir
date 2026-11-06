@@ -10,6 +10,17 @@ it('roundtrips editable source, mapping, layout and local OMR bytes',async()=>{
  expect(await unpackChoirProject(packChoirProject(project))).toEqual(project);
 });
 it('rejects a stale mapping instead of restoring it as confirmed',async()=>{
- const mapping={version:1 as const,revision:'stale',bindings:[]};
+ const mapping={version:1 as const,revision:'stale',bindings:enumerateLanes(loadScoreDoc(xml)).map((l,i)=>({...l,role:ROLES[i],name:ROLES[i],confirmed:true}))};
  await expect(unpackChoirProject(packChoirProject({version:1,sourceXml:xml,mapping,layout:DEFAULT_CHOIR_LAYOUT}))).rejects.toThrow('Stale');
+});
+
+it('rejects unknown entries before unpacking their payload',async()=>{
+ const {zipSync,strToU8}=await import('fflate');
+ await expect(unpackChoirProject(zipSync({'../escape':strToU8('x')}))).rejects.toThrow();
+});
+it('rejects malformed binding field types',async()=>{
+ const mapping={version:1 as const,revision:await sourceRevision(xml),bindings:enumerateLanes(loadScoreDoc(xml)).map((l,i)=>({...l,role:ROLES[i],name:ROLES[i],confirmed:true}))};
+ const {zipSync,strToU8}=await import('fflate');
+ const manifest={version:1,mapping:{...mapping,bindings:mapping.bindings.map(b=>({...b,staff:'1'}))},layout:DEFAULT_CHOIR_LAYOUT};
+ await expect(unpackChoirProject(zipSync({'manifest.json':strToU8(JSON.stringify(manifest)),'source.musicxml':strToU8(xml)}))).rejects.toThrow();
 });
