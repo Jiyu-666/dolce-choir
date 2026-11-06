@@ -35,9 +35,10 @@ export function playDataOfDoc(song: Song, { lead = 0, distinct = false, useSecti
   const pd = new PlayData();
   const part = song.parts[0];
   if (!part) throw new Error("no part");
-  const div = part.measures[0]?.attrs?.divisions ?? 1;
+  let div = 1;
   part.measures.forEach((m, mid) => {
-    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, cursorAt(m, d).divInt(div)));
+    if (m.attrs?.divisions) div = m.attrs.divisions;
+    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, cursorAt(m, d).plus(new Fraction(d.offset ?? 0)).divInt(div)));
   });
   const view = phrasePartOfDoc(song, lead, distinct);
   // 逐遍演唱顺序（123 `%%sing`）：逐页逐行写定的，优先于 `.Repeat`、`P:` 与谱面记号

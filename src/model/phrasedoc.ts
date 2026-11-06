@@ -2,7 +2,7 @@
 //
 // 口径（断点写回文档要按 id 对上）：
 //   - 只留 voice ≤ 1 的非倚音和弦；和弦内取最高音（`jianpu.ts::topNote`，同样是先到者胜）
-//   - 位置/时值按**首小节**的 divisions 折算
+//   - 位置/时值按当前小节生效的 divisions 折算
 //   - `beats`/`beams`/`dot` 按 `<type>` 与附点；唱名、八度点取语义层 `assignDegrees` 的度数
 //   - 小节线、反复、房号、调号变更同引擎输入；另读段落标记（段首硬换行）
 //   - 副歌判定同 `findRefrain`
@@ -95,7 +95,7 @@ export function phrasePartOfDoc(song: Song, partIndex = 0, distinctLyrics = fals
   const part = song.parts[partIndex];
   const idOf = new Map<PhraseChord, ElementId>();
   if (!part) return { part: { measures: [] }, idOf };
-  const div = part.measures[0]?.attrs?.divisions ?? 1;
+  let div = 1;
   const slurStarts = new Set<ElementId>();
   const slurEnds = new Map<ElementId, number>();
   for (const mk of song.marks) {
@@ -109,6 +109,7 @@ export function phrasePartOfDoc(song: Song, partIndex = 0, distinctLyrics = fals
   let time = { beats: 4, beatType: 4 };
   const voice = mainVoiceOf(part);
   part.measures.forEach((m, mi) => {
+    if (m.attrs?.divisions) div = m.attrs.divisions;
     if (m.attrs?.time) time = { beats: m.attrs.time.beats, beatType: m.attrs.time.beatType };
     const out = measureOf(m, part.measures[mi - 1] ?? null, at, div, slurStarts, slurEnds, idOf, time, voice);
     measures.push(out);
@@ -138,7 +139,7 @@ function onsets(m: Measure): Map<Chord, number> {
   const out = new Map<Chord, number>();
   for (const el of m.elements) {
     if (el.kind !== "chord") continue;
-    const p = pos.get(el.voice) ?? 0;
+    const p = el.onset ?? pos.get(el.voice) ?? 0;
     out.set(el, p);
     if (!el.grace) pos.set(el.voice, p + el.duration.divisions);
   }
@@ -147,6 +148,7 @@ function onsets(m: Measure): Map<Chord, number> {
 
 /** 小节时值 = 文档序最后一个（任意声部的）和弦的终点——`loadPart` 在 `removeUnused` 之前取 `Measure.duration`。 */
 function measureEnd(m: Measure, div: number): Fraction {
+  if (m.duration !== undefined) return new Fraction(m.duration).divInt(div);
   const at = onsets(m);
   for (let i = m.elements.length - 1; i >= 0; i--) {
     const el = m.elements[i]!;
@@ -176,6 +178,7 @@ function measureOf(
     time,
     position,
     get duration(): Fraction {
+      if (m.duration !== undefined) return new Fraction(m.duration).divInt(div);
       const last = this.entries[this.entries.length - 1];
       if (!last) throw new Error("measure has no chord");
       return last.position.plus(last.duration);
