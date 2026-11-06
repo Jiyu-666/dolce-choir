@@ -21,3 +21,8 @@ it('retains confirmation for a title-only edit and invalidates a lane selection'
 it('does not commit stale asynchronous source updates',async()=>{
  const s=new ChoirSession();await Promise.all([s.sync(xml),s.sync(xml.replace('Choir test','Latest'))]);expect(s.project!.sourceXml).toContain('Latest');
 });
+it('keeps musical preferences while clearing occurrence selections on a source revision',async()=>{
+ const s=new ChoirSession();await s.sync(xml);s.edit(p=>p.practiceDefaults={role:'B',speed:.75,octave:0,piano:false,metronome:false,loop:false,fromOccurrence:0,toOccurrence:0});
+ await s.sync(xml.replace('Choir test','Changed'));
+ expect(s.project!.practiceDefaults).toMatchObject({role:'B',speed:.75});expect(s.project!.practiceDefaults?.fromOccurrence).toBeUndefined();
+});

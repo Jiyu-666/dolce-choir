@@ -2,6 +2,7 @@ import { unzipSync } from 'fflate';
 import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { verifyMobilePractice } from './mobile-practice.mjs';
 import { verifyComparisonUI } from './comparison-ui.mjs';
 import { verifyMicrophone } from './microphone.mjs';
 import { verifyTransport } from './transport.mjs';
@@ -18,6 +19,8 @@ try {
     await new Promise(r => setTimeout(r, 100));
   }
   browser = await chromium.launch({ headless: true });
+  if (process.env.CHOIR_BROWSER_FOCUS === "mobile") await verifyMobilePractice(browser);
+  else {
   const page = await browser.newPage();
   page.setDefaultTimeout(15000);
   page.on("pageerror", error => console.error(error));
@@ -93,6 +96,7 @@ try {
   await page.locator('.choir-role[data-role="S"] input[type=checkbox]').first().check();
   await page.locator('[data-testid="choir-practice"]').click();
   await page.locator('.practice-score svg').first().waitFor();
+  await page.locator('.practice-settings summary').click();
   assert.equal(await page.locator('.practice-roles button').count(),4);
   await page.locator('[data-testid="practice-microphone"]').uncheck();
   assert(!(await page.locator('[data-testid="practice-piano"]').isChecked()));
@@ -122,8 +126,27 @@ try {
   await verifyAudioExport(page);
   await verifyMicrophone(browser);
   await verifyComparisonUI(browser,xml);
+  await verifyMobilePractice(browser);
+  await page.locator('.practice-box .modal-footer button').click();
+  await page.locator('#btn-choir').click();
+  const practiceDownloadEvent=page.waitForEvent('download');
+  await page.locator('[data-testid="choir-package"]').click();const practiceDownload=await practiceDownloadEvent;
+  await practiceDownload.saveAs('out/browser/satb.dolcepractice');
+  const local=await browser.newPage({viewport:{width:360,height:780}});
+  try {
+    await local.goto('http://127.0.0.1:1420/#/practice/local');
+    await local.locator('[data-testid="practice-package-file"]').setInputFiles(await practiceDownload.path());
+    await local.locator('.practice-score svg').first().waitFor();
+    assert.equal(await local.locator('.practice-roles [data-role="B"]').getAttribute('aria-pressed'),'true');
+    await local.locator('.practice-settings summary').click();
+    assert.equal(await local.locator('[data-testid="practice-speed"]').inputValue(),'3');
+    assert(await local.locator('[data-testid="practice-loop"]').isChecked());
+    assert.equal(await local.evaluate(()=>typeof window.__app),'undefined');
+  } finally { await local.close(); }
+  console.log('PASS: saved practice defaults and actual downloaded package reopened in standalone360px view');
   await mkdir('out/browser', {recursive:true}); await page.screenshot({path:'out/browser/choir-setup.png',fullPage:true});
   console.log('PASS: staff/mixed baseline + SATB setup/confirmation/undo/redo/project roundtrip/draft recovery/source invalidation');
+  }
 } finally {
   await browser?.close(); server.kill();
 }

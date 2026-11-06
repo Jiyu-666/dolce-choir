@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 export async function verifyComparisonUI(browser,xml) {
   const page=await browser.newPage();page.setDefaultTimeout(15000);
   try{
-    await page.goto('http://127.0.0.1:1420/');await page.locator('#btn-start-sample').click();
+    await page.goto('http://127.0.0.1:1420/');await page.waitForFunction(()=>!!window.__app);await page.locator('#btn-start-sample').click();
     await page.evaluate(async text=>{
       const ctx=new AudioContext();await ctx.resume();const oscillator=ctx.createOscillator(),gain=ctx.createGain();gain.gain.value=0;oscillator.connect(gain);oscillator.start();
       const destinations=[];
@@ -13,6 +13,7 @@ export async function verifyComparisonUI(browser,xml) {
     },xml);
     await page.locator('#btn-choir').click();for(const role of ['S','A','T','B'])await page.locator(`.choir-role[data-role="${role}"] input[type=checkbox]`).first().check();
     await page.locator('[data-testid="choir-practice"]').click();await page.locator('.practice-score svg').first().waitFor();
+  await page.locator('.practice-settings summary').click();
     await page.locator('[data-testid="practice-speed"]').fill('3');await page.locator('[data-testid="practice-speed"]').press('Tab');
     const state=()=>page.waitForFunction(()=>document.querySelector('[data-testid="practice-state"]')?.dataset.state==='practicing');
     async function attempt(frequency,sparse=false){

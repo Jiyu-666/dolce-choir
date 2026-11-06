@@ -1,18 +1,25 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import { loadScoreDoc } from "../model/fromxml";
-import { ROLES, type ChoirMapping } from "./mapping";
+import { ROLES, type ChoirMapping, type ChoirRole } from "./mapping";
 import { projectChoir } from "./mapping";
 
 export interface ChoirLayout {
   staffMm: number; jianpuPt: number; layerGapMm: number; groupGapMm: number;
 }
 export const DEFAULT_CHOIR_LAYOUT: ChoirLayout = { staffMm: 7, jianpuPt: 12, layerGapMm: 2, groupGapMm: 4 };
+export interface PracticeDefaults { role:ChoirRole;speed:number;octave:-1|0|1;piano:boolean;metronome:boolean;loop:boolean;fromOccurrence?:number;toOccurrence?:number }
+export const DEFAULT_PRACTICE:PracticeDefaults={role:"S",speed:1,octave:0,piano:false,metronome:false,loop:false};
+export function validatePracticeDefaults(value:unknown):asserts value is PracticeDefaults {
+  const d=value as PracticeDefaults|undefined;
+  if(!d||typeof d!=="object"||Object.keys(d).some(k=>!["role","speed","octave","piano","metronome","loop","fromOccurrence","toOccurrence"].includes(k))||!ROLES.includes(d.role)||!Number.isFinite(d.speed)||d.speed<.25||d.speed>3||![-1,0,1].includes(d.octave)||![d.piano,d.metronome,d.loop].every(v=>typeof v==="boolean")||[d.fromOccurrence,d.toOccurrence].some(v=>v!==undefined&&(!Number.isSafeInteger(v)||v<0))||d.fromOccurrence!==undefined&&d.toOccurrence!==undefined&&d.fromOccurrence>d.toOccurrence)throw new Error("Invalid practice defaults");
+}
 export interface ChoirProject {
   version: 1;
   sourceXml: string;
   editorSource?: { format: "musicxml" | "abc" | "123" | "jpwabc" | "fanqie" | "jcx" | "jly"; text: string };
   mapping: ChoirMapping;
   layout: ChoirLayout;
+  practiceDefaults?:PracticeDefaults;
   /** Optional original .dolce bytes; never included in a shared practice package. */
   originalOmr?: Uint8Array;
 }
@@ -50,11 +57,12 @@ export async function unpackChoirProject(bytes: Uint8Array): Promise<ChoirProjec
   )) throw new Error("Invalid choir mapping schema");
   if (data.editorSource && (!["musicxml", "abc", "123", "jpwabc", "fanqie", "jcx", "jly"].includes(data.editorSource.format) || typeof data.editorSource.text !== "string")) throw new Error("Invalid editor source");
   const l = data.layout;
+  if(data.practiceDefaults!==undefined)validatePracticeDefaults(data.practiceDefaults);
   if (![l.staffMm, l.jianpuPt, l.layerGapMm, l.groupGapMm].every(v => Number.isFinite(v) && v >= 0) || l.staffMm < 3 || l.staffMm > 15 || l.jianpuPt < 6 || l.jianpuPt > 40 || l.layerGapMm > 30 || l.groupGapMm > 50) throw new Error("Invalid choir layout");
   const sourceXml = strFromU8(files["source.musicxml"]), revision = await sourceRevision(sourceXml);
   // A saved editor project can be unconfirmed, but structural/schema failures cannot be restored.
   if (data.mapping.version !== 1 || data.mapping.revision !== revision) throw new Error("Stale choir project mapping");
   const result = projectChoir(loadScoreDoc(sourceXml), data.mapping, revision);
   if (result.issues.some(i => ["roles", "revision"].includes(i.code))) throw new Error("Invalid choir project mapping");
-  return { version: 1, sourceXml, mapping: data.mapping, layout: l, ...(data.editorSource ? { editorSource: data.editorSource } : {}), originalOmr: files["original.dolce"] };
+  return { version: 1, sourceXml, mapping: data.mapping, layout: l, ...(data.practiceDefaults?{practiceDefaults:data.practiceDefaults}:{}), ...(data.editorSource ? { editorSource: data.editorSource } : {}), originalOmr: files["original.dolce"] };
 }

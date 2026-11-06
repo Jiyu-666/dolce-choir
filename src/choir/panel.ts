@@ -232,10 +232,14 @@ class ChoirPanel {
       const p = this.snapshot(), result = this.session.projection;
       if (!result?.doc) throw new Error("Unconfirmed mapping");
       const { showPractice } = await import("./practice");
-      this.practiceClose?.(); this.practiceClose = showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources); this.close?.();
+      this.practiceClose?.(); this.practiceClose = showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources,{defaults:p.practiceDefaults,onDefaultsChange:value=>{this.session.edit(project=>{project.practiceDefaults=value;});this.draft();}}); this.close?.();
     }));
     practice.disabled = issues.length > 0; practice.dataset.testid = "choir-practice";
-    body.append(tracks, cancel, progress, practice);
+    const packageButton=button(t("choir.practicePackage"),()=>void this.run(async()=>{
+      const {buildPracticePackage}=await import("./package");
+      await saveBytes(await buildPracticePackage(this.snapshot(),__APP_VERSION__),`${this.app.documentTitle()}.dolcepractice`);
+    }));packageButton.disabled=issues.length>0;packageButton.dataset.testid="choir-package";
+    body.append(tracks, cancel, progress, practice,packageButton);
     const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
     const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;
     for (const key of ["staffMm", "jianpuPt", "layerGapMm", "groupGapMm"] as const) {

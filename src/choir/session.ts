@@ -32,7 +32,8 @@ export class ChoirSession {
       else delete next.notes;
       return next;
     });
-    this.value = { version: 1, sourceXml: xml, mapping: { version: 1, revision, bindings }, layout: previous?.layout ?? { ...DEFAULT_CHOIR_LAYOUT }, originalOmr };
+    this.value = { version: 1, sourceXml: xml, mapping: { version: 1, revision, bindings }, layout: previous?.layout ?? { ...DEFAULT_CHOIR_LAYOUT }, originalOmr,
+      ...(previous?.practiceDefaults?{practiceDefaults:{...previous.practiceDefaults,fromOccurrence:undefined,toOccurrence:undefined}}:{}) };
     // Old history belongs to another score revision and must never restore stale confirmation.
     this.history = []; this.future = [];
     return true;

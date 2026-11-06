@@ -16,3 +16,7 @@
 .practice-view details { overflow-x: auto; }
 .practice-view table { border-collapse: collapse; font-size: 14px; }
 .practice-view th, .practice-view td { border: 1px solid #888; padding: 6px; white-space: nowrap; }
+
+.practice-roles button { white-space: normal; overflow-wrap: anywhere; }
+.practice-controls label { max-width: 100%; }
+.practice-controls select { max-width: 210px; }

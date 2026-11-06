@@ -1,9 +1,8 @@
 import { zipSync } from "fflate";
 import type { ScoreDoc } from "../model/doc";
 import { withVisibleParts } from "../model/parts";
-import { ScorePainter, type StaffPaintRequest } from "../layout/painter";
+import type { ScorePainter, StaffPaintRequest } from "../layout/painter";
 import { saveBytes } from "../editor/fileio";
-import { svgToBytes } from "../editor/export";
 import type { ChoirLayout } from "./project";
 
 /** All choir display/export consumers use this same request; the source remains untouched. */
@@ -14,13 +13,14 @@ export function choirPaintRequest(doc: ScoreDoc, layout: ChoirLayout, hidden: Re
     jianpuParts: visible.songs[0].parts.map((_, i) => i), choirLayout: { ...layout } };
 }
 export async function exportChoirPng(painter: ScorePainter, name: string): Promise<void> {
+  const { svgToBytes } = await import("../editor/export");
   const files: Record<string, Uint8Array> = {};
   for (let i = 0; i < painter.pageCount; i++) files[`${name}-${i + 1}.png`] = await svgToBytes(painter.renderPage(i), 2);
   if (painter.pageCount === 1) await saveBytes(Object.values(files)[0], `${name}.png`, "image/png");
   else await saveBytes(zipSync(files, { level: 0 }), `${name}-PNG.zip`, "application/zip");
 }
 export async function exportChoirPdf(painter: ScorePainter, name: string): Promise<void> {
-  const { jsPDF } = await import("jspdf");
+  const [{ jsPDF }, { svgToBytes }] = await Promise.all([import("jspdf"),import("../editor/export")]);
   const first = painter.pageSize(0);
   const pdf = new jsPDF({ unit: "pt", format: [first.w, first.h], compress: true });
   for (let i = 0; i < painter.pageCount; i++) {

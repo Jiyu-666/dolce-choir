@@ -50,12 +50,13 @@ export class PracticeTransport {
   isPerformanceAudioTime(audioTime: number): boolean {
     return !!this.value && ["count-in","practicing"].includes(this.state) && audioTime >= this.base + this.resumeAt && audioTime < this.base + this.value.durationSeconds + (this.settings.captureTail ?? 0);
   }
-  constructor(private callbacks: PracticeCallbacks) { document.addEventListener("visibilitychange", this.visibility); }
+  constructor(private callbacks: PracticeCallbacks) { document.addEventListener("visibilitychange", this.visibility);window.addEventListener("pagehide",this.pageHidden); }
   configure(plan: PerformancePlan, settings: TransportSettings): void {
     this.stop(); this.value = freeze(structuredClone(plan)); this.settings = { ...settings }; this.samples = null;
   }
   private setState(state: PracticeState, error?: unknown): void { this.state = state; this.callbacks.state(state, error); }
   private visibility = () => { if (document.hidden && ["loading", "count-in", "practicing"].includes(this.state)) this.pause(); };
+  private pageHidden=()=>this.pause();
   private contextChanged = () => { if (this.ctx?.state !== "running" && ["count-in", "practicing"].includes(this.state)) this.pause(); };
   private track(node: AudioScheduledSourceNode | null): void {
     if (!node) return; this.nodes.add(node); node.addEventListener("ended", () => this.nodes.delete(node), { once: true });
@@ -132,7 +133,7 @@ export class PracticeTransport {
     this.nodes.clear();
   }
   dispose(): void {
-    this.stop(); document.removeEventListener("visibilitychange", this.visibility);
+    this.stop(); document.removeEventListener("visibilitychange", this.visibility);window.removeEventListener("pagehide",this.pageHidden);
     if (this.ctx) { this.ctx.removeEventListener("statechange", this.contextChanged); void this.ctx.close(); this.ctx = null; }
     this.samples = null;
   }
