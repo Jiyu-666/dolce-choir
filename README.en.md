@@ -1,3 +1,5 @@
+> **Dolce Choir development branch**: a SATB notation and practice extension of upstream Dolce, under implementation. No choir practice release is available yet. See [status](docs/choir/STATUS.md) and [agent contract](AGENTS.md). Original documentation and licenses follow.
+
 # Dolce
 
 [中文](README.md) | **English**

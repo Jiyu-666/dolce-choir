@@ -1,0 +1,21 @@
+name: Choir checks
+on:
+  push:
+    branches: [main, feat/choir-v1]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  public-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

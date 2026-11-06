@@ -1,3 +1,5 @@
+> **Dolce Choir 开发分支**：基于上游 Dolce 的四声部制谱与练唱扩展，正在实现，尚未发布可用的合唱练习版。进度与执行规范见 [docs/choir/STATUS.md](docs/choir/STATUS.md) 和 [AGENTS.md](AGENTS.md)。原项目说明及许可保留如下。
+
 # 悦谱 Dolce
 
 **中文** | [English](README.en.md)
