@@ -2,7 +2,22 @@
 import {preview} from 'vite';
 import {chromium} from 'playwright';
 import {readFile,mkdir} from 'node:fs/promises';
+import {unzipSync} from 'fflate';
 import assert from 'node:assert/strict';
+function soloPitches(bytes){
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength),pitches=[],programs=[];assert.equal(view.getUint16(10),2);
+  let pos=8+view.getUint32(4);
+  const variable=()=>{let n=0,b;do{b=bytes[pos++];n=(n<<7)|(b&127);}while(b&128);return n;};
+  while(pos<bytes.length){
+    assert.equal(new TextDecoder().decode(bytes.subarray(pos,pos+4)),'MTrk');const end=pos+8+view.getUint32(pos+4);pos+=8;let running=0;
+    while(pos<end){variable();let status=bytes[pos];if(status&128){pos++;if(status<240)running=status;}else status=running;
+      if(status===255){pos++;const length=variable();pos+=length;continue;}if(status===240||status===247){const length=variable();pos+=length;continue;}
+      assert(status>=128&&status<240);const kind=status&240,a=bytes[pos++],b=kind===192||kind===208?0:bytes[pos++];
+      if(kind===144&&b>0)pitches.push(a);if(kind===192)programs.push(a);
+    }
+  }
+  assert.deepEqual(programs,[0],'Solo is not GM piano');return pitches;
+}
 const base='/dolce-choir/',origin='http://127.0.0.1:1422',url=origin+base;
 const server=await preview({configFile:false,base,build:{outDir:'out/dist'},preview:{host:'127.0.0.1',port:1422,strictPort:true}});
 const served=[];server.httpServer.prependListener('request',request=>served.push(request.url));
@@ -46,6 +61,14 @@ try{
   const xml=await readFile('public/choir/demo.musicxml','utf8');await page.evaluate(async text=>window.__app.importBytes(new TextEncoder().encode(text),'demo.musicxml'),xml);
   await page.locator('#btn-choir').click();for(const r of ['S','A','T','B'])await page.locator(`.choir-role[data-role="${r}"] input[type=checkbox]`).first().check();
   let downloaded=page.waitForEvent('download');await page.locator('[data-testid="choir-tracks"]').click();await(await downloaded).saveAs('out/browser/demo-tracks.zip');
+  const tracks=unzipSync(new Uint8Array(await readFile('out/browser/demo-tracks.zip'))),names=Object.keys(tracks);
+  assert.equal(names.filter(n=>n.endsWith('.mp3')).length,4);assert.equal(names.filter(n=>n.endsWith('.mid')).length,4);
+  const expected=[[72,74,76,79,77,76,74,72,74,76,77,74,72],[67,69,72,72,69,67,67,64,65,67,69,65,64],[64,65,67,64,60,60,59,60,57,60,62,59,55],[48,53,48,48,53,48,43,48,50,48,50,43,48]];
+  for(const [i,r] of ['S','A','T','B'].entries()){
+    assert.deepEqual(soloPitches(tracks[names.find(n=>n.includes(`－${r}`)&&n.endsWith('.mid'))]),expected[i]);
+    const decoded=await page.evaluate(async bytes=>{const ctx=new OfflineAudioContext(1,1,44100),audio=await ctx.decodeAudioData(Uint8Array.from(bytes).buffer);return {duration:audio.duration,rate:audio.sampleRate,channels:audio.numberOfChannels};},Array.from(tracks[names.find(n=>n.includes(`－${r}`)&&n.endsWith('.mp3'))]));
+    assert(decoded.duration>=12&&decoded.duration<12.4&&decoded.rate===44100&&decoded.channels===1,'Export did not follow the hand-calculated12s tempo map');
+  }
   await page.locator('[data-testid="choir-preview"]').click();await page.locator('.choir-preview svg').first().waitFor();
   downloaded=page.waitForEvent('download');await page.getByRole('button',{name:/^(Export choir PDF|导出混排 PDF)$/}).click();await(await downloaded).saveAs('out/browser/demo-mixed.pdf');
   downloaded=page.waitForEvent('download');await page.getByRole('button',{name:/^(Export choir PNG|导出混排 PNG)$/}).click();await(await downloaded).saveAs('out/browser/demo-mixed.png');

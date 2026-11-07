@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 
 export async function verifyMicrophone(browser) {
-  const page=await browser.newPage();
+  // The inherited editor helper can otherwise install COI headers again after route interception.
+  // Disable service workers for this fallback check; pages.mjs separately exercises unblocked production practice.
+  const page=await browser.newPage({serviceWorkers:'block'});
   try {
     // Exercise an actually non-isolated page, as on GitHub Pages (no SharedArrayBuffer).
     await page.route('http://127.0.0.1:1420/',async route=>{
