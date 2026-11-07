@@ -7,7 +7,7 @@ Baseline: lodebar2026/dolce bb3333208d53b74bedb58b8530b1402eed54ed01.
 | Task | State | Required work and acceptance |
 |---|---|---|
 | T00 | 已验证 | Verify/create public fork, origin/upstream, feat/choir-v1; retain licenses. Remote creation may require browser login. |
-| T01 | 已实现待验证 | Node22 locked install, baseline typecheck/build, independent public Vitest + browser CI and handmade fixtures; optional upstream private tests remain separate. |
+| T01 | 已验证 | Node22 locked install, baseline typecheck/build, independent public Vitest + browser CI and handmade fixtures; optional upstream private tests remain separate. |
 | T02 | 已实现待验证 | Enumerate part/staff/voice; explicit SATB bindings; monophonic derived ScoreDoc with provenance, metadata/timing/marks preserved; ambiguity diagnostics and no source mutation. Test 4 parts, 2x2 voices, 1 part/2 staves/4 voices, sparse voice numbers, chords/crossing/unison. |
 | T03 | 已实现待验证 | Role setup/solo/source navigation; explicit confirmation; .dolcechoir ZIP + drafts/undo; reopen mappings by structural identity, invalidate affected bindings and cached assets on edits. Old .dolce remains compatible. |
 | T04 | 已实现待验证 | Reuse existing repeat expansion; add occurrence ranges/tempo map; piecewise beat↔seconds; numeric/dotted-unit tempi, conflicts, ties, jumps, selection and MIDI tempo events; update playback pause/seek/speed/loop. Hand-computed timing gate before scoring. |
@@ -25,4 +25,4 @@ Gates: T04 music correct → T09 honest local comparison → T13 real-device end
 
 Completion: independently import/correct/map a score, export four mixed groups + four MP3/MIDI, publish a link, practice selected voice on phone and obtain measured, qualified feedback.
 
-Current execution checkpoint: T11 local service passed; T12 subpath/CI verification in progress. Production and physical-device acceptance remain blocked by unavailable configuration/devices. See STATUS.md for input/output commits and ACCEPTANCE.md for evidence.
+Current execution checkpoint: T11 local service passed; T12 subpath and remote CI checks passed atd8690ff3; production remains pending. Production and physical-device acceptance remain blocked by unavailable configuration/devices. See STATUS.md for input/output commits and ACCEPTANCE.md for evidence.
