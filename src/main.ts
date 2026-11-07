@@ -376,6 +376,13 @@ async function boot() {
   if (await app.tryRestoreLastFile()) revealWorkspace();
   // 草稿：问要不要恢复
   if (await app.offerDraftRestore(draft)) revealWorkspace();
+  if(new URL(location.href).searchParams.get("choirAuth")==="1"){
+    try{
+      const {sharingAuth}=await import("./choir/share-client");await sharingAuth().auth.getSession();
+      const url=new URL(location.href);url.searchParams.delete("choirAuth");url.searchParams.delete("code");history.replaceState(null,"",url);
+      revealWorkspace();const {showChoirPanel}=await import("./choir/panel");await showChoirPanel(app);
+    }catch{startFeedback.textContent=t("share.failed");}
+  }
 
   // 静默检查新版本（仅桌面版，自身还会判开关与 24h 节流）。延后是为了不和
   // 启动页、OMR 模型加载抢资源；查不到就什么都不做。

@@ -239,7 +239,8 @@ class ChoirPanel {
       const {buildPracticePackage}=await import("./package");
       await saveBytes(await buildPracticePackage(this.snapshot(),__APP_VERSION__),`${this.app.documentTitle()}.dolcepractice`);
     }));packageButton.disabled=issues.length>0;packageButton.dataset.testid="choir-package";
-    body.append(tracks, cancel, progress, practice,packageButton);
+    const sharing=button(t("share.title"),()=>void this.run(async()=>{const {showSharePanel}=await import("./share-ui");await showSharePanel(this.snapshot());}));sharing.disabled=issues.length>0;sharing.dataset.testid="choir-sharing";
+    body.append(tracks, cancel, progress, practice,packageButton,sharing);
     const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
     const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;
     for (const key of ["staffMm", "jianpuPt", "layerGapMm", "groupGapMm"] as const) {

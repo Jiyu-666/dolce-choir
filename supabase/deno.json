@@ -1,0 +1,5 @@
+{
+  "unstable": ["sloppy-imports"],
+  "nodeModulesDir": "manual",
+  "compilerOptions": {"strict": true, "lib": ["deno.ns", "dom", "dom.iterable", "es2022"], "noUnusedLocals": true, "noUnusedParameters": true}
+}

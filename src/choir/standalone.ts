@@ -7,6 +7,8 @@ import { setMeasureBackend } from "../common/measure";
 import { browserMeasure,ensureFontsReady } from "../common/measure.browser";
 import { PaintResources } from "../layout/painter";
 import { readPracticePackage } from "./package";
+import {shareRequest,shareConfig} from "./share-config";
+import {validShareToken} from "./share-contract";
 import { showPractice } from "./practice";
 
 function el<K extends keyof HTMLElementTagNameMap>(tag:K,text=""):HTMLElementTagNameMap[K]{const node=document.createElement(tag);node.textContent=text;return node;}
@@ -38,7 +40,9 @@ export async function bootPractice():Promise<void>{
       if(path==="demo"){
         const response=await fetch(asset("choir/demo.dolcepractice"));if(!response.ok)throw new Error("Demo unavailable");await load(new Uint8Array(await response.arrayBuffer()),gen);
       }else if(!path||path==="local")status.textContent=t("practice.choosePackage");
-      else status.textContent=t("practice.shareUnconfigured");
+      else if(!shareConfig())status.textContent=t("practice.shareUnconfigured");
+      else if(validShareToken(path)){const response=await shareRequest("resolve",JSON.stringify({token:path}));await load(new Uint8Array(await response.arrayBuffer()),gen);}
+      else status.textContent=t("practice.invalidPackage");
     }catch{if(gen===generation)status.textContent=t("practice.invalidPackage");}
   }
   window.addEventListener("hashchange",()=>{if(location.hash.startsWith("#/practice"))void route();});
