@@ -1,6 +1,7 @@
 // 界面文案（中文，同时是键的权威清单）。新增文字两边同加：en.ts 漏键 tsc 报错。
 // 占位写 {name}，由 t(key, { name }) 替换。
 export const zh = {
+  "practice.trialHint": "判唱试用 · 建议清唱",
   "choir.layout": "合唱版式（显示设置不改变声部分配）",
   "choir.layout.staffMm": "五线谱高度（mm）",
   "choir.layout.jianpuPt": "简谱字号（pt）",

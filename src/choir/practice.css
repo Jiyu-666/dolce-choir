@@ -20,3 +20,6 @@
 .practice-roles button { white-space: normal; overflow-wrap: anywhere; }
 .practice-controls label { max-width: 100%; }
 .practice-controls select { max-width: 210px; }
+.practice-feedback:empty { display: none; }
+.practice-trial { font-size: 13px; margin: 8px 0; }
+.practice-settings { margin-top: 16px; }

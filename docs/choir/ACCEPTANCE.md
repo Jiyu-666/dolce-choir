@@ -1,29 +1,6 @@
-# Execution status
+# Automatic and device acceptance evidence
 
-Input commit: bb3333208d53b74bedb58b8530b1402eed54ed01. Branch: feat/choir-v1.
-
-| Task | State | Evidence / next action |
-|---|---|---|
-| T00 | 已验证 | User completed fork flow; renamed to Jiyu-666/dolce-choir in GitHub UI; fork provenance shown. origin/upstream set, feat/choir-v1 push succeeded. |
-| T01 | 已实现待验证 | Node22 typecheck/build + 38 public tests + Chromium original staff/mixed smoke passed. CI defined; broader handmade rhythm/repeat fixtures and remote CI pending. |
-| T02 | 已实现待验证 | 15 mapping + 4 XML music-semantic tests pass; chord-tone slurs/pitchless notes now fail correctly. Broader uncommon-jump corpus still pending. |
-| T03 | 已实现待验证 | UI setup/confirmation/solo/source note location, undo/redo, ZIP + raw editor source/OMR recovery, IndexedDB draft, per-lane invalidation; Chromium save/reopen/draft/invalidation passed. Real OMR roundtrip still pending. |
-| T04 | 已实现待验证 | Shared TempoClock, repeat occurrences, numeric/dotted tempo, MIDI tempi, true selected-part playback, compiled PerformancePlan. Nine tempo + two performance tests pass. Broader jump/tie combinations remain to extend. |
-| T05 | 已实现待验证 | Four-layer preview + PDF/PNG; independent mm/pt controls; measured ink clearances; 32-bar SATB browser test passed (12pt:4pages, 24pt:6pages). Source unchanged, simultaneous x aligned. Physical print/phone and wider curve fixtures pending. |
-| T06 | 已实现待验证 | Four true single-role piano MP3/MIDI ZIP with attribution, sample loader/shared scheduler, continuous Worker encoder,20s blocks/two-pass whole-track peak, cancel/revision guard. Chromium scale/silence/seam/cancel/600s decode and UI ZIP passed. Real phone download/listen and memory profiling pending. |
-| T07 | 已实现待验证 | Practice UI + immutable transport, separate default-off guide/click, cue/300ms/count-in, bar rewind, loops, AudioContext clock and cleanup. Chromium flows including second-bar resume/new-pitch cue passed. No microphone feedback yet. |
-| T08 | 已实现待验证 | Pitchy4.1.0, mono Worklet→Worker,4096/1024 actual-rate windows, quiet calibration, noise/clarity gating, median smoothing and explicit gaps. Non-isolated Chromium synthetic stream/permission denial/cleanup passed. Strong2nd harmonic octave failure recorded; real human/device validation pending. |
-| T09 | 已实现待验证 | Fixed-time comparison, strict octave/cents, time-weighted coverage/accuracy, bounded evidenced attacks, rests/gaps/rewind, optional pulse latency calibration/manual correction and result UI. Deterministic suite + actual synthetic mic UI passed. Physical/human/calibration acoustics pending; trial only. |
-| T10–T13 | 未开始 | No standalone mobile route, sharing or production deployment claim. |
-
-Next: T10 lightweight standalone practice route and local practice package; then sharing service implementation. User has no Supabase project and asked to continue local work; production sharing is deferred, not mocked as live.
-
-Input commit for new data code: 5765be25. Commands/results: see ACCEPTANCE. Changes are additive src/choir and public tests; no OMR edits or dependency upgrades. Original source metadata is kept; unsupported anchors or unresolved voice data block projection instead of being discarded.
-
-
-No implementation, deployment or physical-device acceptance is claimed merely from this document.
-
-Commits: 5765be25 (execution/public-check foundation); 2163b2ec (mapping); a3099196 (project codec/browser baseline). Draft PR: https://github.com/Jiyu-666/dolce-choir/pull/1. Remote CI at a3099196 had passed install/typecheck/unit tests and was still building when observed; do not infer completion.
+Current task states are maintained in STATUS.md; the entries below record checks actually run at each input commit. This file does not imply physical devices or production cloud have passed.
 
 ## 2026-11-06 continuation evidence
 Input: 78274dbc. Outputs: 89db4d52 (musical ownership fixes), 7f888388 (session/project/draft), 9347580d (unified timing), c69242cc (setup UI).
@@ -48,3 +25,6 @@ Outputs already committed: T05d02f2e5f, T06c1c57d47, T07216cce2c, T08e6b5d723, T
 
 ## T11 real local service acceptance
 SupabaseCLI3 native AppleSilicon local stack; real database migration/Auth/privateStorage/Edge function checks passed. SeededGitHub identity is trusted AuthDB test data, not an OAuth-provider mock and not evidence of real GitHub login. API checked anonymous/nonmaintainer/crossowner denial, rawtoken absent from DB, repeatedrequestsameID, packagebytes+no-store, invalid/revoked404, privateobject/list denial and failed-upload rowcleanup. Real browser UI published curatedscore, producedQR/link, anonymous360px page opened/played/paused, owner revoked and reloadfailed; no token in requestURLs. Local testusers/objects removed; stack stopped after testing. Production and real phones pending.
+
+## T10 production-view supplement (input4d114ead)
+Visual inspection of the real360px production screenshot exposed an unusable first view: verbose status text and a duplicate oversized printed title hid the notes. A staff snippet flag now suppresses only the practice header/space; source and exported page requests are untouched. Device details move into advanced settings, a visible trial hint remains, and the music follows primary controls. New assertions require the actual first system's bounding box fully inside the initial phone viewport. Focused mobile flows,81unit tests and strict types passed. Fresh standalone routes no longer register the upstream COI helper that would automatically reload the page; editor isolation retains its old behavior. No test expectation for musical semantics changed.

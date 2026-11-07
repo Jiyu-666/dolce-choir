@@ -7,6 +7,8 @@
     <!-- 跨源隔离垫片：GitHub Pages 无法设响应头，用 SW 客户端补 COOP/COEP 以启用 SharedArrayBuffer
          （onnxruntime-web wasm 多线程，OMR 识别 ~2x）。按 BASE_URL 取绝对路径（子路径部署与 /en/ 页共用一份，SW 作用域覆盖整站）；Tauri/dev 已原生发头
          → 页面已隔离 → 脚本自动跳过。首次访问会自动多刷新一次。 -->
+    <!-- 独立练习无需 OMR 隔离，不为首次练习注册会自动刷新页面的辅助 SW。 -->
+    <script>window.coi = { shouldRegister: () => !location.hash.startsWith("#/practice") };</script>
     <script src="%BASE_URL%coi-serviceworker.js"></script>
 
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />

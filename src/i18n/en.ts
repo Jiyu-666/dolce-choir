@@ -2,6 +2,7 @@
 import type { MsgKey } from "./zh";
 
 export const en: Record<MsgKey, string> = {
+  "practice.trialHint": "Pitch feedback is experimental · Sing a cappella",
   "choir.layout": "Choir layout (display settings keep voice mapping)",
   "choir.layout.staffMm": "Staff height (mm)",
   "choir.layout.jianpuPt": "Jianpu size (pt)",

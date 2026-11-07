@@ -49,6 +49,8 @@ export interface StaffPaintRequest {
   readonly choirLayout?: import("../choir/project").ChoirLayout;
   /** 谱里的换行换页是源文写明的，当硬断点（`MixedOptions.sourceBreaks`） */
   readonly sourceBreaks?: boolean;
+  /** 手机练习片段：标题在界面外部展示，谱面仅放音乐。 */
+  readonly snippet?: boolean;
 }
 
 /** 原样文档这一路（文本谱与多声部 123/ABC、MusicXML 的简谱档）：整份 `ScoreDoc` 按源行排，印刷原版观感。
@@ -303,7 +305,8 @@ export class ScorePainter {
       options.mixStaffDist = c.layerGapMm * 40 / c.staffMm;
     }
     const score = layoutStaff(req.doc, options);
-    const { pages, placed } = layoutStaffPages(score, req.view === "mixed", req.jianpuParts ?? req.jianpuPart ?? 0, req.choirLayout ? req.choirLayout.groupGapMm * 40 / req.choirLayout.staffMm : 12);
+    if (req.snippet) score.credits = [];
+    const { pages, placed } = layoutStaffPages(score, req.view === "mixed", req.jianpuParts ?? req.jianpuPart ?? 0, req.choirLayout ? req.choirLayout.groupGapMm * 40 / req.choirLayout.staffMm : 12, req.snippet);
     const d = score.defaults;
     const wT = d.pageWidth ?? 1200;
     const hT = d.pageHeight ?? PAGE_HEIGHT_FALLBACK;

@@ -7,6 +7,8 @@ export async function verifyMobilePractice(browser){
     await page.locator('.practice-score svg').first().waitFor();
     assert.equal(await page.evaluate(()=>typeof window.__app),'undefined');
     assert(await page.locator('[data-testid="practice-start"]').isVisible());
+    const firstSystem=await page.locator('.practice-score .staff-system').first().boundingBox();
+    assert(firstSystem&&firstSystem.height>40&&firstSystem.y>=0&&firstSystem.y+firstSystem.height<710,'Actual first music system must be readable in the initial phone viewport');
     await page.screenshot({path:'out/browser/mobile-practice-portrait.png',fullPage:true});
     await page.locator('.practice-settings summary').click();
     assert.equal(await page.locator('.practice-roles button').count(),4);

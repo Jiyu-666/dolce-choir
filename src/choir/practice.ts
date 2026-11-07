@@ -25,6 +25,7 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
   const status = el("p"); status.setAttribute("role", "status"); status.dataset.testid = "practice-state";
   const clock = el("output"), score = el("div"); score.className = "practice-score";
   const warning = el("p", t("practice.transportOnly"));
+  const trialHint = el("p", t("practice.trialHint")); trialHint.className = "practice-trial";
   const tempoText=el("p");
   const feedback = el("p"), summary = el("section"); feedback.className = "practice-feedback";
   feedback.dataset.testid = "practice-feedback"; feedback.setAttribute("role","status"); summary.dataset.testid = "practice-summary";
@@ -54,12 +55,13 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
       if(comparison&&["count-in","practicing"].includes(transport.state))comparison.gap({from:transport.planSecondsAtAudioTime(gap.from),to:transport.planSecondsAtAudioTime(gap.to)});
       feedback.dataset.state="uncertain"; feedback.textContent = t("practice.analysisGap");
     },
-    error: () => { transport.pause(); micText.textContent = t("practice.micError"); },
+    error: () => { transport.pause(); status.textContent = t("practice.micError"); },
   });
   const transport = new PracticeTransport({
     prepare: async (ctx, signal) => {
       if (!mic.checked) return;
       micText.textContent = t("practice.quietCalibrating");
+      status.textContent = t("practice.quietCalibrating");
       await input.start(ctx, signal);
       if(!comparison)comparison=new PracticeComparison(plan,await fingerprint,attempt,ctx.sampleRate,{seconds:delay.valueAsNumber/1000,calibrated:calibrationKey!==null&&calibrationKey===input.deviceKey});
       delayStatus.textContent=t(comparison.latency.calibrated?"practice.rhythmCalibrated":"practice.rhythmEstimated");
@@ -72,7 +74,7 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
       if(["ready","paused","count-in","loading","error"].includes(state)){feedback.dataset.state="uncertain";feedback.textContent=state==="count-in"?t("practice.noCountInScore"):"";}
       if(state==="practicing")comparison?.resume(transport.audioContext!.currentTime);
       if(state==="completed"&&comparison)showResult(comparison.result());
-      if (state === "error" && error instanceof Error) micText.textContent = error.message === "Quiet environment needed" ? t("practice.quietRetry") : t("practice.micError");
+      if (state === "error" && error instanceof Error) status.textContent = error.message === "Quiet environment needed" ? t("practice.quietRetry") : t("practice.micError");
       start.disabled = !!calibrationController || ["loading", "count-in", "practicing"].includes(state);
       pause.disabled = !["loading", "count-in", "practicing"].includes(state);
     },
@@ -166,7 +168,7 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
     const gen = ++paintGeneration, selected = ROLES.indexOf(role), next = new ScorePainter(resources);
     const scale=zoom.valueAsNumber/100;
     const request = choirPaintRequest(doc, {...layout,staffMm:layout.staffMm*scale,jianpuPt:layout.jianpuPt*scale}, full.checked?new Set():new Set(ROLES.flatMap((_, i) => i === selected ? [] : [i])));
-    await next.load({ ...request, page: { widthPt: Math.min(600,Math.max(280,score.clientWidth)) * .75, heightPt: null, override: true, marginsPt: [12,12,12,12] } });
+    await next.load({ ...request, snippet: true, page: { widthPt: Math.min(600,Math.max(280,score.clientWidth)) * .75, heightPt: null, override: true, marginsPt: [12,12,12,12] } });
     if (gen !== paintGeneration) return;
     painter = next; activeId = undefined; activeSystem = null; score.replaceChildren();
     for (let i = 0; i < painter.pageCount; i++) score.append(painter.renderPage(i));
@@ -174,8 +176,8 @@ export function showPractice(doc: ScoreDoc, revision: string, layout: ChoirLayou
   for (const input of [from,to,speed,octave,piano,metronome,loop,mic]) input.addEventListener("change", configure);
   start.addEventListener("click", () => { if(!calibrationController)void transport.start(); }); pause.addEventListener("click", () => transport.pause()); stop.addEventListener("click", () => {calibrationController?.abort();transport.stop();});
   const actions = el("div"); actions.className = "practice-actions"; actions.append(start,pause,stop,clock);
-  const settings=el("details");settings.className="practice-settings";settings.append(el("summary",t("practice.settings")),controls);
-  body.append(roles,actions,settings,status,feedback,warning,tempoText,micText,delayStatus,score,summary);
+  const settings=el("details");settings.className="practice-settings";settings.append(el("summary",t("practice.settings")),controls,warning,tempoText,micText,delayStatus);
+  body.append(roles,actions,status,feedback,trialHint,score,settings,summary);
   const close = el("button", t("parts.done"));
   let observer:ResizeObserver|null=null;
   const resized=()=>{if(Math.abs(body.clientWidth-lastWidth)>1){lastWidth=body.clientWidth;requestPaint();}};let lastWidth=0;

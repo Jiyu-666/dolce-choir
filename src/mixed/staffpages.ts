@@ -720,7 +720,7 @@ export interface StaffPages {
 }
 
 /** 一份已读入的 `StaffLayout` 排成页（`showJianpuLayer` = 混排叠简谱层）。长图会改写 `score.defaults.pageHeight`。 */
-export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, jianpuPart: number | readonly number[] = 0, groupGap = 12): StaffPages {
+export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, jianpuPart: number | readonly number[] = 0, groupGap = 12, snippet = false): StaffPages {
   if (showJianpuLayer && typeof jianpuPart !== "number") formatChoirScore(score, jianpuPart, groupGap);
   else if (showJianpuLayer) formatMixedScore(score, jianpuPart as number);
   else placeAboveStaff(score, false);
@@ -728,7 +728,7 @@ export function layoutStaffPages(score: StaffLayout, showJianpuLayer: boolean, j
   // M5: flow layout
   const items = getFrames(score);
   const footers = score.longImage ? new Set<ScoreCredit>() : footerCredits(score.credits, score.defaults.pageHeight ?? PAGE_HEIGHT_FALLBACK);
-  if (items.length > 0) {
+  if (items.length > 0 && !snippet) {
     // Add title block (credits) to first frame；页脚另画（`footerCredits`），不进页眉块、不让位
     items[0].credits = score.credits.filter(c => c.page === 0 && !footers.has(c));
     // 自动铺排的标题块由 autoLayoutHeader 从上往下堆，词曲行多了会高过缺省的 TITLE_OFFSET：按最低那行让开
