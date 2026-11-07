@@ -1,4 +1,5 @@
 import type { App } from "../editor/app";
+import {isolateHistory} from "@codemirror/commands";
 import { formatOf } from "../editor/formats";
 import { openModal } from "../editor/dialogs";
 import { saveBytes } from "../editor/fileio";
@@ -8,7 +9,8 @@ import { choirPaintRequest, exportChoirPdf, exportChoirPng } from "./layout";
 import { ScorePlayer } from "../editor/player";
 import { loadScoreDoc } from "../model/fromxml";
 import { scoreDocToMusicXml } from "../model/toxml";
-import { playSourceOfDoc } from "../model/playdoc";
+import { playSourceOfDoc,tempoConflictsOfDoc,type NumericTempoCandidate } from "../model/playdoc";
+import {chooseSourceTempo} from "./tempos";
 import { t, type MsgKey } from "../i18n";
 import { enumerateLanes, ROLES, type MappingIssue, type ChoirRole } from "./mapping";
 import { ChoirSession, setLane, sourceNoteChoices } from "./session";
@@ -186,6 +188,21 @@ class ChoirPanel {
     const msg = element("p", this.message); msg.setAttribute("role", "status"); body.append(msg);
     if (!project || !this.sourceValid) return;
     const doc = loadScoreDoc(project.sourceXml), lanes = enumerateLanes(doc);
+    let tempoProblems:NumericTempoCandidate[][]=[],invalidTempo=false;
+    try{tempoProblems=tempoConflictsOfDoc(doc.songs[0]);}catch{invalidTempo=true;body.append(element("p",t("choir.musicProblem")));}
+    for(const group of tempoProblems){
+      const row=element("section"),choice=element("select"),at=group[0];row.dataset.testid="choir-tempo-conflict";
+      row.append(element("p",t("choir.tempoConflict",{measure:at.measure+1,beat:at.beat+1})));choice.append(new Option(t("choir.choose"),""));
+      group.forEach((c,i)=>choice.append(new Option(`${c.partId?doc.songs[0].parts.find(p=>p.id===c.partId)?.name??c.partId:t("choir.tempoHeader")} · ♩ = ${Number(c.bpm.toFixed(3))}`,String(i))));
+      const apply=button(t("choir.tempoApply"),()=>void this.run(async()=>{
+        if(choice.value===""||this.sourceXml()!==project.sourceXml)throw new Error("Stale tempo source");
+        this.app.view.dispatch({annotations:isolateHistory.of("before")});
+        if(!this.app.editScoreDoc(source=>chooseSourceTempo(source.songs[0],at.measure,at.beat,group[Number(choice.value)].bpm)))throw new Error("Source tempo correction unavailable");
+        this.app.view.dispatch({annotations:isolateHistory.of("after")});
+        clearTimeout(this.timer);await this.sync();
+      }));apply.disabled=true;choice.setAttribute("aria-label",t("choir.tempoChoose"));choice.addEventListener("change",()=>{apply.disabled=choice.value===""||this.app.docFormat!=="musicxml"||this.syncing;});
+      row.append(choice,apply,element("p",t("choir.tempoSourceEdit")));body.append(row);
+    }
     for (const binding of project.mapping.bindings) {
       const section = element("section"); section.className = "choir-role"; section.dataset.role = binding.role;
       section.append(element("h3", t(`choir.role.${binding.role}`)));
@@ -221,11 +238,12 @@ class ChoirPanel {
       body.append(section);
     }
     const issues = this.session.projection?.issues ?? [];
+    const blocked=issues.length>0||tempoProblems.length>0||invalidTempo;
     const list = element("ul"); list.dataset.testid = "choir-issues";
     for (const issue of issues) list.append(element("li", `${issue.role ?? ""} ${issue.measure !== undefined ? t("choir.measure", { n: issue.measure + 1 }) : ""} ${t(issueKeys[issue.code])}`));
-    body.append(issues.length ? list : element("p", t("choir.ready")));
+    body.append(issues.length ? list : element("p", t(blocked?"choir.musicProblem":"choir.ready")));
     const tracks = button(t("choir.exportTracks"), () => void this.run(() => this.tracks()));
-    tracks.disabled = !!this.audioJob || issues.length > 0; tracks.dataset.testid = "choir-tracks";
+    tracks.disabled = !!this.audioJob || blocked; tracks.dataset.testid = "choir-tracks";
     const cancel = button(t("choir.cancelExport"), () => this.audioJob?.abort()); cancel.disabled = !this.audioJob;
     const progress = element("p", this.audioProgress); progress.dataset.testid = "audio-progress"; progress.setAttribute("role", "status");
     const practice = button(t("practice.title"), () => void this.run(async () => {
@@ -234,12 +252,12 @@ class ChoirPanel {
       const { showPractice } = await import("./practice");
       this.practiceClose?.(); this.practiceClose = showPractice(result.doc, p.mapping.revision, p.layout, this.app.painter.resources,{defaults:p.practiceDefaults,onDefaultsChange:value=>{this.session.edit(project=>{project.practiceDefaults=value;});this.draft();}}); this.close?.();
     }));
-    practice.disabled = issues.length > 0; practice.dataset.testid = "choir-practice";
+    practice.disabled = blocked; practice.dataset.testid = "choir-practice";
     const packageButton=button(t("choir.practicePackage"),()=>void this.run(async()=>{
       const {buildPracticePackage}=await import("./package");
       await saveBytes(await buildPracticePackage(this.snapshot(),__APP_VERSION__),`${this.app.documentTitle()}.dolcepractice`);
-    }));packageButton.disabled=issues.length>0;packageButton.dataset.testid="choir-package";
-    const sharing=button(t("share.title"),()=>void this.run(async()=>{const {showSharePanel}=await import("./share-ui");await showSharePanel(this.snapshot());}));sharing.disabled=issues.length>0;sharing.dataset.testid="choir-sharing";
+    }));packageButton.disabled=blocked;packageButton.dataset.testid="choir-package";
+    const sharing=button(t("share.title"),()=>void this.run(async()=>{const {showSharePanel}=await import("./share-ui");await showSharePanel(this.snapshot());}));sharing.disabled=blocked;sharing.dataset.testid="choir-sharing";
     body.append(tracks, cancel, progress, practice,packageButton,sharing);
     const layout = element("fieldset"); layout.append(element("legend", t("choir.layout")));
     const ranges = { staffMm: [3, 15, .5], jianpuPt: [6, 40, 1], layerGapMm: [0, 30, .5], groupGapMm: [0, 50, .5] } as const;

@@ -2,6 +2,11 @@
 import type { MsgKey } from "./zh";
 
 export const en: Record<MsgKey, string> = {
+  "choir.tempoConflict": "Conflicting tempi at measure {measure}, quarter-note position {beat}.",
+  "choir.tempoHeader": "Initial tempo",
+  "choir.tempoChoose": "Choose authoritative quarter-note BPM",
+  "choir.tempoApply": "Apply tempo to source score",
+  "choir.tempoSourceEdit": "An explicit choice updates numeric tempi at this position and can be undone in the source editor. Affected roles need confirmation again. For non-MusicXML, correct the tempo in the original editor.",
   "practice.trialHint": "Pitch feedback is experimental · Sing a cappella",
   "choir.layout": "Choir layout (display settings keep voice mapping)",
   "choir.layout.staffMm": "Staff height (mm)",

@@ -1,6 +1,11 @@
 // 界面文案（中文，同时是键的权威清单）。新增文字两边同加：en.ts 漏键 tsc 报错。
 // 占位写 {name}，由 t(key, { name }) 替换。
 export const zh = {
+  "choir.tempoConflict": "第 {measure} 小节，第 {beat} 个四分音符拍位有速度冲突。",
+  "choir.tempoHeader": "曲首速度",
+  "choir.tempoChoose": "选择权威速度（四分音符 BPM）",
+  "choir.tempoApply": "采用此速度并更新原谱",
+  "choir.tempoSourceEdit": "明确选择后统一此拍位的数字速度，可用原谱撤销。受影响声部需重新确认；非 MusicXML 请在原编辑器校正速度。",
   "practice.trialHint": "判唱试用 · 建议清唱",
   "choir.layout": "合唱版式（显示设置不改变声部分配）",
   "choir.layout.staffMm": "五线谱高度（mm）",

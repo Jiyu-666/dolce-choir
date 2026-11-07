@@ -193,27 +193,42 @@ function lyricsOfPart(song: Song, partIndex: number): Map<ElementId, TimelineLyr
   return out;
 }
 
-/** Numeric tempi at source measure/beat coordinates, with cross-part conflict detection. */
-export function tempoEventsOfDoc(song: Song): { measure: number; beat: number; bpm: number }[] {
-  const events = new Map<string, { measure: number; beat: number; bpm: number }>();
+export interface NumericTempoCandidate { measure:number; beat:number; bpm:number; partId?:string; direction?:Direction; beatFactor:number }
+/** The same numeric values/positions feed playback, diagnostics and explicit source corrections. */
+export function tempoCandidatesOfDoc(song: Song): NumericTempoCandidate[] {
+  const candidates:NumericTempoCandidate[]=[];
   const units: Record<string, number> = { maxima:32, long:16, breve:8, whole:4, half:2, quarter:1, eighth:.5, "16th":.25, "32nd":.125, "64th":.0625, "128th":.03125 };
   const header = song.tempos?.find((v): v is number => typeof v === "number");
-  if (header !== undefined) events.set("0:0", { measure:0, beat:0, bpm:header*(song.tempoBeat ? 4*song.tempoBeat.num/song.tempoBeat.den : 1) });
+  if (header !== undefined) {const beatFactor=song.tempoBeat ? 4*song.tempoBeat.num/song.tempoBeat.den : 1;candidates.push({measure:0,beat:0,bpm:header*beatFactor,beatFactor});}
   for (const part of song.parts) {
     let div = part.measures[0]?.attrs?.divisions ?? 1;
     part.measures.forEach((m, measure) => {
       if (m.attrs?.divisions) div = m.attrs.divisions;
       for (const d of m.directions ?? []) {
-        const bpm = d.sound?.tempo ?? (d.tempo?.perMinute !== undefined ? d.tempo.perMinute*(units[d.tempo.beatUnit ?? "quarter"] ?? 1)*(d.tempo.beatUnitDot ? 1.5 : 1) : undefined);
+        const beatFactor=(units[d.tempo?.beatUnit ?? "quarter"] ?? 1)*(d.tempo?.beatUnitDot ? 1.5 : 1);
+        const bpm = d.sound?.tempo ?? (d.tempo?.perMinute !== undefined ? d.tempo.perMinute*beatFactor : undefined);
         if (bpm === undefined) continue;
         if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("Invalid numeric tempo");
         const beat = directionBeat(m,d,div).toFloat();
         if (beat < 0) throw new Error("Negative tempo position");
-        const key = `${measure}:${beat}`, previous = events.get(key);
-        if (previous && Math.abs(previous.bpm-bpm)>1e-6) throw new Error(`Conflicting tempo at measure ${measure+1}, beat ${beat}`);
-        events.set(key,{measure,beat,bpm});
+        candidates.push({measure,beat,bpm,beatFactor,partId:part.id,direction:d});
       }
     });
+  }
+  return candidates;
+}
+export function tempoConflictsOfDoc(song:Song):NumericTempoCandidate[][]{
+  const groups=new Map<string,NumericTempoCandidate[]>();
+  for(const c of tempoCandidatesOfDoc(song)){const key=`${c.measure}:${c.beat}`,group=groups.get(key)??[];group.push(c);groups.set(key,group);}
+  return [...groups.values()].filter(group=>group.some(c=>Math.abs(c.bpm-group[0].bpm)>1e-6));
+}
+/** Numeric tempi at source measure/beat coordinates, with cross-part conflict detection. */
+export function tempoEventsOfDoc(song: Song): { measure: number; beat: number; bpm: number }[] {
+  const events = new Map<string, { measure: number; beat: number; bpm: number }>();
+  for(const {measure,beat,bpm} of tempoCandidatesOfDoc(song)){
+    const key=`${measure}:${beat}`,previous=events.get(key);
+    if(previous&&Math.abs(previous.bpm-bpm)>1e-6)throw new Error(`Conflicting tempo at measure ${measure+1}, beat ${beat}`);
+    events.set(key,{measure,beat,bpm});
   }
   return [...events.values()].sort((a,b)=>a.measure-b.measure || a.beat-b.beat);
 }

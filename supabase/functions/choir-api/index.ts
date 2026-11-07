@@ -22721,6 +22721,7 @@ function readMeasure(el, ids, marks) {
         const s = readSound(c);
         if (s) d.sound = s;
         if (m.elements.length > 0) d.afterElements = m.elements.length;
+        if (cursor !== end) d.onset = cursor;
         (m.directions ??= []).push(d);
         break;
       }

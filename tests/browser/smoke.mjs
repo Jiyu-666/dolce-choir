@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 import { readFile, mkdir } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { verifyMobilePractice } from './mobile-practice.mjs';
+import { verifyTempoChoice } from './tempo-choice.mjs';
 import { verifyComparisonUI } from './comparison-ui.mjs';
 import { verifyMicrophone } from './microphone.mjs';
 import { verifyTransport } from './transport.mjs';
@@ -126,6 +127,7 @@ try {
   await verifyAudioExport(page);
   await verifyMicrophone(browser);
   await verifyComparisonUI(browser,xml);
+  await verifyTempoChoice(browser,xml);
   await verifyMobilePractice(browser);
   await page.locator('.practice-box .modal-footer button').click();
   await page.locator('#btn-choir').click();
