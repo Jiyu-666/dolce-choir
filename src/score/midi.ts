@@ -23,7 +23,7 @@ function varLen(n: number): number[] {
   return bytes;
 }
 
-function trackChunk(events: Ev[]): number[] {
+function trackChunk(events: Ev[], endTick = 0): number[] {
   events.sort((a, b) => a.tick - b.tick || a.order - b.order);
   const body: number[] = [];
   let prev = 0;
@@ -32,12 +32,33 @@ function trackChunk(events: Ev[]): number[] {
     body.push(...e.data);
     prev = e.tick;
   }
-  body.push(...varLen(0), 0xff, 0x2f, 0x00); // end of track
+  body.push(...varLen(Math.max(0, endTick - prev)), 0xff, 0x2f, 0x00); // end of track
   const len = body.length;
   return [0x4d, 0x54, 0x72, 0x6b, (len >> 24) & 0xff, (len >> 16) & 0xff, (len >> 8) & 0xff, len & 0xff, ...body];
 }
 
 const utf8 = new TextEncoder();
+
+/** Serialize a compiled solo plan directly: no second pass through repeat/pitch inference. */
+export function soloPianoMidi(plan: {
+  durationBeats: number; speed: number; tempos: { t: number; bpm: number }[];
+  notes: { startBeat: number; endBeat: number; pitch: number; velocity: number }[];
+}, name: string): Uint8Array {
+  const events: Ev[] = [
+    { tick: 0, order: -2, data: metaText(0x03, name) },
+    { tick: 0, order: -1, data: [0xc0, 0] }, // GM acoustic grand piano, channel1
+  ];
+  for (const note of plan.notes) {
+    if (!Number.isInteger(note.pitch) || note.pitch < 0 || note.pitch > 127) throw new Error("MIDI pitch out of range");
+    events.push({ tick: Math.round(note.startBeat * PPQ), order: 2, data: [0x90, note.pitch, note.velocity] });
+    events.push({ tick: Math.round(note.endBeat * PPQ), order: 0, data: [0x80, note.pitch, 0] });
+  }
+  return new Uint8Array([
+    0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, PPQ >> 8, PPQ & 255,
+    ...tempoTrack(plan.tempos, 90, plan.speed, plan.durationBeats),
+    ...trackChunk(events, Math.round(plan.durationBeats * PPQ)),
+  ]);
+}
 
 /** 文字类元事件（`FF type len text`），文本按 UTF-8 写（中文歌词各家歌声合成软件都这么认）。 */
 function metaText(type: number, text: string): number[] {
@@ -45,14 +66,11 @@ function metaText(type: number, text: string): number[] {
   return [0xff, type, ...varLen(bytes.length), ...bytes];
 }
 
-function tempoTrack(bpm: number): number[] {
-  const mpqn = Math.round(60000000 / bpm);
-  const ev: Ev = {
-    tick: 0,
-    order: 0,
-    data: [0xff, 0x51, 0x03, (mpqn >> 16) & 0xff, (mpqn >> 8) & 0xff, mpqn & 0xff],
-  };
-  return trackChunk([ev]);
+function tempoTrack(tempos: Timeline["tempos"], fallback: number, speed: number, duration: number): number[] {
+  return trackChunk((tempos.length ? tempos : [{t:0,bpm:fallback}]).map(t => {
+    const mpqn = Math.round(60000000 / (t.bpm*speed));
+    return { tick: Math.round(t.t*PPQ), order:0, data:[0xff,0x51,0x03,(mpqn>>16)&0xff,(mpqn>>8)&0xff,mpqn&0xff] };
+  }), Math.round(duration*PPQ));
 }
 
 /** GM 的打击乐通道（第 10 通道）：声部不占它，节拍器的嘀嗒写在这儿。 */
@@ -105,17 +123,18 @@ function clickTrack(clicks: Timeline["clicks"]): number[] {
  * 导出的 MIDI 各声部轨带轨名与歌词事件（按演唱顺序逐遍取段，见 `timeline.ts::lyricOfPass`）；试听那份不带歌词。
  */
 export function toMidi(src: PlaySource, opts?: PlayOptions, click = false): Uint8Array {
-  const { notes, clicks } = buildTimeline(src);
+  const { notes, clicks, tempos, duration } = buildTimeline(src);
+  const parts = src.parts.map((_,i)=>i).filter(i=>opts?.selectedParts?.includes(i) ?? true);
   const withClick = click && opts?.metronome === true && clicks.length > 0;
-  const ntracks = 1 + src.parts.length + (withClick ? 1 : 0);
+  const ntracks = 1 + parts.length + (withClick ? 1 : 0);
   const header = [
     0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, // MThd, len 6
     0, 1, // format 1
     (ntracks >> 8) & 0xff, ntracks & 0xff,
     (PPQ >> 8) & 0xff, PPQ & 0xff, // division (ticks per quarter)
   ];
-  const out: number[] = [...header, ...tempoTrack(playTempo(src, opts))];
-  for (let i = 0; i < src.parts.length; i++) out.push(...partTrack(notes, i, opts, src.parts[i]!.name, !click));
+  const out: number[] = [...header, ...tempoTrack(tempos, playTempo(src), playTempo(src, opts)/playTempo(src), duration)];
+  for (const i of parts) out.push(...partTrack(notes, i, opts, src.parts[i]!.name, !click));
   if (withClick) out.push(...clickTrack(clicks));
   return new Uint8Array(out);
 }

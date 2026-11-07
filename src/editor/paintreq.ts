@@ -109,6 +109,8 @@ export interface StaffRequestOpts {
   /** 声部面板里藏起来的声部（会话内） */
   hiddenParts?: ReadonlySet<number>;
   melodyPart?: number;
+  jianpuParts?: readonly number[];
+  choirLayout?: StaffPaintRequest["choirLayout"];
   /** ABC 的代码换行与 `%%newpage` 就是谱面换行换页（§6.1）：五线谱照它分，不另按宽度重排（issue 24） */
   sourceBreaks: boolean;
 }
@@ -130,6 +132,8 @@ export function staffPaintRequest(doc: ScoreDoc, o: StaffRequestOpts): StaffPain
     hideBarNumber: o.hideBarNumber,
     // 简谱层取的声部下标跟着藏起来的声部往前挪
     jianpuPart: hidden.has(melody) ? 0 : melody - [...hidden].filter((i) => i < melody).length,
+    jianpuParts: o.jianpuParts?.filter(i => !hidden.has(i)).map(i => i - [...hidden].filter(h => h < i).length),
+    choirLayout: o.choirLayout,
     sourceBreaks: o.sourceBreaks,
   };
 }

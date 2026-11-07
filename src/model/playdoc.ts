@@ -35,9 +35,10 @@ export function playDataOfDoc(song: Song, { lead = 0, distinct = false, useSecti
   const pd = new PlayData();
   const part = song.parts[0];
   if (!part) throw new Error("no part");
-  const div = part.measures[0]?.attrs?.divisions ?? 1;
+  let div = 1;
   part.measures.forEach((m, mid) => {
-    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, cursorAt(m, d).divInt(div)));
+    if (m.attrs?.divisions) div = m.attrs.divisions;
+    for (const d of m.directions ?? []) if (d.sound) addSound(pd, d, new TimePosition(mid, directionBeat(m,d,div)));
   });
   const view = phrasePartOfDoc(song, lead, distinct);
   // 逐遍演唱顺序（123 `%%sing`）：逐页逐行写定的，优先于 `.Repeat`、`P:` 与谱面记号
@@ -102,17 +103,22 @@ function playOrderOfDoc(song: Song, lead: number, view: ReturnType<typeof phrase
 
 /** `<direction>` 处的游标（divisions）：它前面最后一个非倚音和弦的终点，各声部各自累计。 */
 function cursorAt(m: Measure, d: Direction): Fraction {
+  if (d.onset !== undefined) return new Fraction(d.onset);
   const pos = new Map<number, number>();
   let end = 0;
   const n = Math.min(d.afterElements ?? 0, m.elements.length);
   for (let i = 0; i < n; i++) {
     const el = m.elements[i]!;
     if (el.kind !== "chord" || el.grace) continue;
-    const p = pos.get(el.voice) ?? 0;
+    const p = el.onset ?? pos.get(el.voice) ?? 0;
     end = p + el.duration.divisions;
     pos.set(el.voice, end);
   }
   return new Fraction(end);
+}
+/** Shared source-direction position; playback controls and numeric tempi use the same cursor. */
+export function directionBeat(m: Measure, direction: Direction, divisions: number): Fraction {
+  return cursorAt(m,direction).plus(new Fraction(direction.offset ?? 0)).divInt(divisions);
 }
 
 /** 同 `parseSound`（速度除外）。 */
@@ -145,13 +151,13 @@ export function playSourceOfDoc(song: Song, options: PlaySourceOptions = {}): Pl
   if (options.melodyOnly) {
     const playData = playDataOfDoc(song);
     playData.tempo = tempoOfDoc(song);
-    return { parts: [phrasePartOfDoc(song).part], playData };
+    return { parts: [phrasePartOfDoc(song).part], playData, tempoEvents: tempoEventsOfDoc(song) };
   }
   const lead = leadPartOf(song);
   const playData = playDataOfDoc(song, { lead, distinct: true });
   playData.tempo = tempoOfDoc(song);
   const slurs = slursOf(song);
-  return { parts: song.parts.map((p, i) => timelinePartOf(p, i === lead, slurs, lyricsOfPart(song, i))), playData, lead };
+  return { parts: song.parts.map((p, i) => timelinePartOf(p, i === lead, slurs, lyricsOfPart(song, i))), playData, lead, tempoEvents: tempoEventsOfDoc(song) };
 }
 
 /** 连音弧的起止和弦（`TimelineChord.slurStart` / `slurEnds`，判一字多音用；同 `phrasedoc.ts` 的统计）。 */
@@ -187,15 +193,47 @@ function lyricsOfPart(song: Song, partIndex: number): Map<ElementId, TimelineLyr
   return out;
 }
 
-/** 谱面速度：第一声部里第一处 `<sound tempo>`（20..400，取整），同 `parseSound`。 */
-export function tempoOfDoc(song: Song): number {
-  for (const m of song.parts[0]?.measures ?? []) {
-    for (const d of m.directions ?? []) {
-      const t = d.sound?.tempo;
-      if (t !== undefined && t >= 20 && t <= 400) return Math.round(t);
-    }
+export interface NumericTempoCandidate { measure:number; beat:number; bpm:number; partId?:string; direction?:Direction; beatFactor:number }
+/** The same numeric values/positions feed playback, diagnostics and explicit source corrections. */
+export function tempoCandidatesOfDoc(song: Song): NumericTempoCandidate[] {
+  const candidates:NumericTempoCandidate[]=[];
+  const units: Record<string, number> = { maxima:32, long:16, breve:8, whole:4, half:2, quarter:1, eighth:.5, "16th":.25, "32nd":.125, "64th":.0625, "128th":.03125 };
+  const header = song.tempos?.find((v): v is number => typeof v === "number");
+  if (header !== undefined) {const beatFactor=song.tempoBeat ? 4*song.tempoBeat.num/song.tempoBeat.den : 1;candidates.push({measure:0,beat:0,bpm:header*beatFactor,beatFactor});}
+  for (const part of song.parts) {
+    let div = part.measures[0]?.attrs?.divisions ?? 1;
+    part.measures.forEach((m, measure) => {
+      if (m.attrs?.divisions) div = m.attrs.divisions;
+      for (const d of m.directions ?? []) {
+        const beatFactor=(units[d.tempo?.beatUnit ?? "quarter"] ?? 1)*(d.tempo?.beatUnitDot ? 1.5 : 1);
+        const bpm = d.sound?.tempo ?? (d.tempo?.perMinute !== undefined ? d.tempo.perMinute*beatFactor : undefined);
+        if (bpm === undefined) continue;
+        if (!Number.isFinite(bpm) || bpm <= 0) throw new Error("Invalid numeric tempo");
+        const beat = directionBeat(m,d,div).toFloat();
+        if (beat < 0) throw new Error("Negative tempo position");
+        candidates.push({measure,beat,bpm,beatFactor,partId:part.id,direction:d});
+      }
+    });
   }
-  return 0;
+  return candidates;
+}
+export function tempoConflictsOfDoc(song:Song):NumericTempoCandidate[][]{
+  const groups=new Map<string,NumericTempoCandidate[]>();
+  for(const c of tempoCandidatesOfDoc(song)){const key=`${c.measure}:${c.beat}`,group=groups.get(key)??[];group.push(c);groups.set(key,group);}
+  return [...groups.values()].filter(group=>group.some(c=>Math.abs(c.bpm-group[0].bpm)>1e-6));
+}
+/** Numeric tempi at source measure/beat coordinates, with cross-part conflict detection. */
+export function tempoEventsOfDoc(song: Song): { measure: number; beat: number; bpm: number }[] {
+  const events = new Map<string, { measure: number; beat: number; bpm: number }>();
+  for(const {measure,beat,bpm} of tempoCandidatesOfDoc(song)){
+    const key=`${measure}:${beat}`,previous=events.get(key);
+    if(previous&&Math.abs(previous.bpm-bpm)>1e-6)throw new Error(`Conflicting tempo at measure ${measure+1}, beat ${beat}`);
+    events.set(key,{measure,beat,bpm});
+  }
+  return [...events.values()].sort((a,b)=>a.measure-b.measure || a.beat-b.beat);
+}
+export function tempoOfDoc(song: Song): number {
+  return tempoEventsOfDoc(song).find(t => t.measure === 0 && t.beat === 0)?.bpm ?? 0;
 }
 
 /** 力度记号 → note-on velocity。表外的（`sf`/`fp` 这类瞬时重音）不改当前力度。 */
@@ -213,7 +251,7 @@ function timelinePartOf(
   lyrics?: ReadonlyMap<ElementId, TimelineLyric[]>,
 ): TimelinePart {
   // 时值按首小节 divisions 折算，与演唱顺序的落点（`playDataOfDoc`）同口径
-  const div = part.measures[0]?.attrs?.divisions ?? 1;
+  let divisions = part.measures[0]?.attrs?.divisions ?? 1;
   let time = { beats: 4, beatType: 4 };
   let velocity = DEFAULT_VELOCITY;
   /** 移调乐器（`<transpose>`）：记谱音高加这么多半音才是实际发声 */
@@ -221,6 +259,8 @@ function timelinePartOf(
   const measures: TimelineMeasure[] = [];
   const mainVoice = mainVoiceOf(part);
   for (const m of part.measures) {
+    if (m.attrs?.divisions) divisions = m.attrs.divisions;
+    const div = divisions;
     if (m.attrs?.time) time = { beats: m.attrs.time.beats, beatType: m.attrs.time.beatType };
     if (m.attrs?.transpose) shift = m.attrs.transpose.chromatic + 12 * (m.attrs.transpose.octaveChange ?? 0);
     const dyn = (m.directions ?? [])
@@ -261,6 +301,7 @@ function timelinePartOf(
           const x = e.position.plus(e.duration);
           if (x.compareTo(end) > 0) end = x;
         }
+        if (m.duration !== undefined) { const full = new Fraction(m.duration, div); if (full.compareTo(end) > 0) end = full; }
         return end;
       },
     });

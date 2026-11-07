@@ -1,3 +1,4 @@
+import type { TempoPoint } from "./tempo";
 // Shared "score model -> timed note events" flattening, honoring the expanded
 // play order (repeats / voltas / D.C. / D.S. / Coda) in playData.measures (PlayItem[]).
 // Consumed by both the MIDI export (toMidi) and the in-editor player (ScorePlayer),
@@ -20,6 +21,8 @@ export const SPEED_STEPS = [0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5, 2] as const;
 
 /** Mixing options shared by MIDI export and playback. */
 export interface PlayOptions {
+  /** Actual part selection; excluded parts are not synthesized or written to MIDI. */
+  selectedParts?: readonly number[];
   /** Per-part linear volume in [0,1]; index = part index. Missing/undefined = 1. */
   partVolumes?: number[];
   /** 试听时打节拍器（每拍一声，小节第一拍重） */
@@ -88,6 +91,7 @@ export interface PlaySource {
   /** 按模型的声部序（声部面板、MIDI 轨序都按它） */
   readonly parts: readonly TimelinePart[];
   readonly playData: PlayData;
+  readonly tempoEvents?: readonly { measure: number; beat: number; bpm: number }[];
   /** 主旋律声部（带歌词的那个；演唱顺序按它推、光标跟它、同刻起音先取它）。缺省 0 */
   readonly lead?: number;
 }
@@ -149,6 +153,8 @@ export interface Anchor {
 }
 
 export interface Timeline {
+  tempos: TempoPoint[];
+  occurrences: { measure: number; occurrence: number; pass: number; t0: number; t1: number; sourceFrom: number; sourceTo: number }[];
   notes: TimedNote[];
   anchors: Anchor[]; // melody (`PlaySource.lead`) sounding chords, ascending by t0 — for cursor
   /** 所有声部、所有 voice 的起音和弦（按 t0 升序，同刻主旋律在前、其余按声部序）。五线谱的竖直播放线跟它走：女高音休止、别的声部在唱也照走 */
@@ -218,6 +224,16 @@ export function buildTimeline(src: PlaySource): Timeline {
   const anchors: Anchor[] = [];
   const allAnchors: Anchor[] = [];
   const clicks: Timeline["clicks"] = [];
+  const tempos: TempoPoint[] = [];
+  const occurrences: Timeline["occurrences"] = [];
+  const seen = new Map<number, number>();
+  const sourceTempos = [...(src.tempoEvents ?? [])].sort((a,b) => a.measure-b.measure || a.beat-b.beat);
+  const initialTempo = src.playData.tempo > 0 ? src.playData.tempo : TEMPO;
+  const addTempo = (t: number, bpm: number): void => {
+    const last = tempos[tempos.length-1];
+    if (last?.t === t) last.bpm = bpm;
+    else if (last?.bpm !== bpm) tempos.push({ t, bpm });
+  };
   let pos = 0; // running timeline position in quarter notes
   /** 各声部各音高最近一个音（延音线收尾时找它延长） */
   const lastByPitch = new Map<string, TimedNote>();
@@ -261,6 +277,15 @@ export function buildTimeline(src: PlaySource): Timeline {
     for (let mid = range.mid; mid < range.end; mid++) {
       const startOffset = mid === range.mid ? range.offset : 0;
       const endOffset = mid === range.end - 1 ? range.until : Number.POSITIVE_INFINITY;
+      const sourceEnd = Math.min(measureLen(src, mid), endOffset);
+      let bpm = initialTempo;
+      for (const tempo of sourceTempos) {
+        if (tempo.measure < mid || (tempo.measure === mid && tempo.beat <= startOffset)) bpm = tempo.bpm;
+      }
+      addTempo(pos, bpm);
+      for (const tempo of sourceTempos) if (tempo.measure === mid && tempo.beat > startOffset && tempo.beat < sourceEnd) addTempo(pos + tempo.beat - startOffset, tempo.bpm);
+      const occurrence = (seen.get(mid) ?? 0) + 1; seen.set(mid, occurrence);
+      occurrences.push({ measure: mid, occurrence, pass: range.pass, t0:pos, t1:pos+sourceEnd-startOffset, sourceFrom:startOffset, sourceTo:sourceEnd });
       for (let pi = 0; pi < src.parts.length; pi++) {
         const m = src.parts[pi]!.measures[mid];
         if (!m) continue;
@@ -270,7 +295,7 @@ export function buildTimeline(src: PlaySource): Timeline {
           if (cp < startOffset) continue; // clipped by a mid-measure jump entry
           if (cp >= endOffset) continue; // clipped by PlayItem.limit
           const t0 = pos + (cp - startOffset);
-          const t1 = t0 + (ent.duration?.toFloat() ?? 0);
+          const t1 = Math.min(pos + sourceEnd - startOffset, t0 + (ent.duration?.toFloat() ?? 0));
           if (pi === lead && !ent.rest && ent.cursor !== false) anchors.push({ t0, chord: ent, pass: range.pass });
           if (!ent.rest) {
             const an: Anchor = { t0, chord: ent, pass: range.pass };
@@ -345,5 +370,5 @@ export function buildTimeline(src: PlaySource): Timeline {
       if (n > 0) a.occ = n;
     }
   }
-  return { notes, anchors, allAnchors, clicks, duration: pos };
+  return { notes, anchors, allAnchors, clicks, tempos, occurrences, duration: pos };
 }

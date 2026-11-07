@@ -1,0 +1,25 @@
+.practice-box { width: min(760px, 96vw); }
+.practice-view { max-height: 78vh; overflow: auto; padding: 8px; }
+.practice-roles, .practice-controls, .practice-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.practice-controls { margin-top: 12px; }
+.practice-controls label { display: flex; gap: 6px; align-items: center; }
+.practice-controls input[type=number] { width: 65px; }
+.practice-view button, .practice-view input, .practice-view select { min-height: 40px; }
+.practice-roles button[aria-pressed=true] { outline: 2px solid #489ee8; }
+.practice-actions { position: sticky; top: 0; padding: 8px 0; background: var(--panel, #222); z-index: 1; }
+.practice-score svg { position: relative; inset: auto; display: block; width: 100%; height: auto; background: white; margin-top: 12px; }
+
+.practice-feedback { min-height: 24px; padding: 8px; border-radius: 5px; background: #eee; color: #333; }
+.practice-feedback[data-state=correct] { background: #e1f5e7; color: #196536; }
+.practice-feedback[data-state=sharp], .practice-feedback[data-state=flat], .practice-feedback[data-state=octave-high], .practice-feedback[data-state=octave-low], .practice-feedback[data-state=rest-voice] { background: #fff0db; color: #8a3900; }
+.practice-view section button { margin: 4px; }
+.practice-view details { overflow-x: auto; }
+.practice-view table { border-collapse: collapse; font-size: 14px; }
+.practice-view th, .practice-view td { border: 1px solid #888; padding: 6px; white-space: nowrap; }
+
+.practice-roles button { white-space: normal; overflow-wrap: anywhere; }
+.practice-controls label { max-width: 100%; }
+.practice-controls select { max-width: 210px; }
+.practice-feedback:empty { display: none; }
+.practice-trial { font-size: 13px; margin: 8px 0; }
+.practice-settings { margin-top: 16px; }

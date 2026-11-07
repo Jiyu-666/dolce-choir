@@ -42,3 +42,8 @@ docs/ss-收敛待办.md
 
 # 回归脚本、语料与歌本样式：本地私有仓库（与本仓库同级的 dev/），不入库
 dev/
+
+# Local deployment configuration
+.env
+.env.local
+.env.*.local

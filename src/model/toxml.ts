@@ -769,7 +769,7 @@ function measureXml(
     }
   };
   const writeDir = (dir: Direction): void => {
-    if (dir.type !== "sound") moveTo(dir.onset ?? end);
+    moveTo(dir.onset ?? end);
     directionXml(o, dir, cx);
   };
   const writeHarmony = (h: Harmony, owner: number): void => {

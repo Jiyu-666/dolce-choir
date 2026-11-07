@@ -306,6 +306,9 @@ export class App implements OmrHost, PlaybackHost, FormatHost, FormatSwitchHost,
     this.scorePane.style.setProperty("--score-page-bg", colorToCss(this.style.bgColor));
   }
 
+  /** Choir controller invalidates derived snapshots on source edits/imports. */
+  choirSourceChanged?: (newDocument?: boolean) => void;
+
   mountEditor(parent: HTMLElement, initialText: string): void {
     const updateListener = EditorView.updateListener.of((u) => {
       if (u.docChanged) {
@@ -314,6 +317,7 @@ export class App implements OmrHost, PlaybackHost, FormatHost, FormatSwitchHost,
         this.omr.remapStaffLinks((pos) => u.changes.mapPos(pos, 1, MapMode.TrackDel));
         this.scheduleReload();
         this.files._scheduleDraft();
+        this.choirSourceChanged?.();
       }
       // 光标/选区一动就同步到谱面。文档改了不在这里同步——索引还是旧偏移，
       // 等 reload 重建完索引再由 SyncView.build 刷一次。
@@ -1119,6 +1123,7 @@ export class App implements OmrHost, PlaybackHost, FormatHost, FormatSwitchHost,
     this.lyricPart = null;
     this.hiddenParts.clear();
     this.playback.resetMix();
+    this.choirSourceChanged?.(true);
   }
 
   // ---------------- 声部（声部面板 `editor/parts.ts`） ----------------

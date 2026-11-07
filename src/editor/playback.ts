@@ -1,3 +1,4 @@
+import type { TempoClock } from "../score/tempo";
 // 试听播放的编辑器侧控制器：播放器实例、速度倍率与分声部音量、播放/暂停/停止按钮、进度条与速度下拉。
 //
 // 从 App 里切出来的一块。**谱面高亮不在这里**——按元素 id + 遍次找到画出来的那个音
@@ -45,7 +46,7 @@ export class PlaybackController {
   /** 停止状态下拖进度条 / 点音符定下的起播秒数；开播后清掉。 */
   private cueSec: number | null = null;
   /** 停止状态下算总长、换算起播点用的时间线（按谱与速度缓存）。 */
-  private tlCache: { src: PlaySource; speed: number; tl: Timeline; spq: number } | null = null;
+  private tlCache: { src: PlaySource; speed: number; tl: Timeline; clock: TempoClock } | null = null;
   /** 逐声部线性音量 [0,1]，下标 = 声部序号。缺省视为 1（满音量）。 */
   readonly partVolumes: number[] = [];
   /** 播放速度倍率（相对谱面标注速度）。持久化。 */
@@ -125,7 +126,7 @@ export class PlaybackController {
     const t = src ? this.timeline(src) : null;
     if (!t) return null;
     const pts = this.host.loopPoints();
-    return (pts && spanSeconds(t.tl, t.spq, pts.first, pts.last)) ?? { from: 0, to: t.tl.duration * t.spq };
+    return (pts && spanSeconds(t.tl, t.clock, pts.first, pts.last)) ?? { from: 0, to: t.clock.secondsAt(t.tl.duration) };
   }
 
   // ---------------- 工具条绑定 ----------------
@@ -301,7 +302,7 @@ export class PlaybackController {
     if (start === null) {
       const pt = this.host.startPoint();
       const t = pt ? this.timeline(src) : null;
-      start = pt && t ? anchorSeconds(t.tl, t.spq, pt) : null;
+      start = pt && t ? anchorSeconds(t.tl, t.clock, pt) : null;
     }
     this.cueSec = null;
     const p = this.instance();
@@ -355,7 +356,7 @@ export class PlaybackController {
     }
     const src = this.host.playable();
     const t = src ? this.timeline(src) : null;
-    this.cueSec = t ? anchorSeconds(t.tl, t.spq, point) : null;
+    this.cueSec = t ? anchorSeconds(t.tl, t.clock, point) : null;
     this.refreshProgress();
   }
 
@@ -381,12 +382,12 @@ export class PlaybackController {
   }
 
   /** 停止状态下的时间线（总长、起播点换算）；按谱与速度缓存。 */
-  private timeline(src: PlaySource): { tl: Timeline; spq: number } | null {
+  private timeline(src: PlaySource): { tl: Timeline; clock: TempoClock } | null {
     const c = this.tlCache;
     if (c && c.src === src && c.speed === this.speed) return c;
     try {
-      const { tl, spq } = timelineSeconds(src, this.options());
-      this.tlCache = { src, speed: this.speed, tl, spq };
+      const { tl, clock } = timelineSeconds(src, this.options());
+      this.tlCache = { src, speed: this.speed, tl, clock };
       return this.tlCache;
     } catch (e) {
       console.error("试听时间线拼不出", e);
@@ -423,7 +424,7 @@ export class PlaybackController {
     if (!this.progressEl && !this.timeEl) return 0;
     const src = this.host.canPlay ? this.host.playable() : null;
     const t = src ? this.timeline(src) : null;
-    return t ? t.tl.duration * t.spq : 0;
+    return t ? t.clock.secondsAt(t.tl.duration) : 0;
   }
 
   private renderProgress(pos: number): void {
