@@ -1,4 +1,4 @@
-> **Dolce Choir 开发分支**：基于上游 Dolce 的四声部制谱与练唱扩展，正在实现，尚未发布可用的合唱练习版。进度与执行规范见 [docs/choir/STATUS.md](docs/choir/STATUS.md) 和 [AGENTS.md](AGENTS.md)。原项目说明及许可保留如下。
+> **Dolce Choir 测试分支**：基于上游 Dolce，已实现 SATB 四组简谱＋五线谱、分声部钢琴 MP3/MIDI、轻量手机练习及本地分享服务。实时判唱仍为试用；正式云服务与实体手机尚待验收，不能视为首版交付。参见[本地使用与部署](docs/choir/RUNNING.md)、[进度](docs/choir/STATUS.md)、[设备验收](docs/choir/DEVICE-ACCEPTANCE.md)和[执行约束](AGENTS.md)。本 Fork 的合唱功能需从代码本地运行；下面的在线/下载链接属于上游原版。原项目说明与许可保留如下。
 
 # 悦谱 Dolce
 

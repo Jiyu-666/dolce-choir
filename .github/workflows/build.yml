@@ -6,6 +6,7 @@ on:
 
 jobs:
   build:
+    if: github.repository == 'lodebar2026/dolce'
     permissions:
       contents: write
     strategy:
@@ -73,6 +74,7 @@ jobs:
 
   # Web 版随同一 release 部署到 GitHub Pages
   pages-build:
+    if: github.repository == 'lodebar2026/dolce'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -97,6 +99,7 @@ jobs:
           path: out/dist
 
   pages-deploy:
+    if: github.repository == 'lodebar2026/dolce'
     needs: pages-build
     runs-on: ubuntu-latest
     permissions:

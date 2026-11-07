@@ -16,10 +16,10 @@ Input commit: bb3333208d53b74bedb58b8530b1402eed54ed01. Branch: feat/choir-v1.
 | T09 | 已实现待验证 | Fixed-time comparison, strict octave/cents, time-weighted coverage/accuracy, bounded evidenced attacks, rests/gaps/rewind, optional pulse latency calibration/manual correction and result UI. Deterministic suite + actual synthetic mic UI passed. Physical/human/calibration acoustics pending; trial only. |
 | T10 | 已实现待验证 | Hash-routed lazy practice entry, versioned local package, verified structural ID rebinding, stored-plan range/speed/octave derivation,360px/landscape/reload/background tests; no editor/OMR requests. Physical phones pending. |
 | T11 | 已实现待验证 | Private bucket/RLS/migration, verifiedAuth GitHub numericID gate, create/list/revoke/resolve, hashed192bit tokens inPOST, immutable packages, idempotency/cleanup, maintainer UI/QR. Real local Supabase+browser E2E passed; real OAuth/cloud pending. |
-| T12 | 进行中 | Independent frontend/backend CI, manual Pages workflow, public-config guard, build identity and production-subpath checks. Production configuration remains unavailable. |
+| T12 | 已实现待验证 | Independent frontend/backend CI, manual Pages workflow, public-config guard, build identity and production-subpath checks. Production configuration remains unavailable. |
 | T13 | 受阻 | Physical device/human/production acceptance not available. DEVICE-ACCEPTANCE.md records exact pending operations; no substitute claim. |
 
-Next: verify T12 production-subpath build and remote CI, finish local deliverables and handoff. Production configuration remains unavailable by user choice. User has no Supabase project and asked to continue local work; production sharing is deferred, not mocked as live.
+Next: verify remote CI, finalize local example delivery. Production-subpath browser checks passed; physical acceptance remains pending. Production configuration remains unavailable by user choice. User has no Supabase project and asked to continue local work; production sharing is deferred, not mocked as live.
 
 Input commit for new data code: 5765be25. Commands/results: see ACCEPTANCE. Changes are additive src/choir and public tests; no OMR edits or dependency upgrades. Original source metadata is kept; unsupported anchors or unresolved voice data block projection instead of being discarded.
 
@@ -52,3 +52,6 @@ T11 inputae1f3517. Official SupabaseCLI3.0.0 native runtime used under ignoredou
 One unit run encountered process/RPC timeouts after an unusually long wall-clock interruption; it is recorded as failed. After stopping local services the complete suite reran successfully:81/81 in1.22s; no timeout or assertion was weakened.
 
 T11 output4d114ead. T12 input4d114ead. Scope: independent real backend CI, manual subpath Pages deployment/rollback, build-time public-config validation and build-info; fresh practice route skips upstream automatic COI service-worker registration/reload. Documentation includes local/cloud setup, preserved package-v1 compatibility and physical acceptance templates. Node22 strict types,81unit tests,2build-config tests and complete existing Chromium suite passed. Subpath production checks are running; no production deploy performed.
+T10 production-view supplement output8a3ada8a. First-system visibility now explicitly checked at360px; full export layout remains unchanged.
+
+T12 local checks: production /dolce-choir/ build and actual browser passed nonisolated synthetic pitch Worklet/Worker, piano/font/WASM paths, English/hash refresh, visible first mobile music system and four-track ZIP/PDF/PNG downloads. Build-config checks reject secret/server JWT before output, allow unconfigured local use, require configured sharing for manual production workflow. Backend original Deno source and deterministic generated entry checked. No deployment or real OAuth performed.

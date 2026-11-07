@@ -18,6 +18,38 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:build-config
       - run: npm run build
+        env:
+          BASE_PATH: /dolce-choir/
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:pages
       - run: npm run test:browser
+  sharing-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_HOME: ${{ github.workspace }}/out/supabase-home
+      DENO_DIR: ${{ github.workspace }}/out/deno-cache
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check:share
+      - name: Check bundled function is up to date
+        run: |
+          npm run build:share
+          git diff --exit-code -- supabase/functions/choir-api/
+      - run: npx playwright install --with-deps chromium
+      - name: Start real local services (no cloud credentials)
+        run: |
+          mkdir -p out
+          npx supabase start --runtime native --exclude studio,mail,analytics,realtime,pooler --preparation on-demand --eager > out/supabase-start.log 2>&1
+          npx supabase status --output-format json > out/supabase-status.json
+      - run: npm run test:share
+      - name: Stop local services
+        if: always()
+        run: npx supabase stop > /dev/null 2>&1

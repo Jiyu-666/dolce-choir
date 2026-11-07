@@ -1,4 +1,4 @@
-> **Dolce Choir development branch**: a SATB notation and practice extension of upstream Dolce, under implementation. No choir practice release is available yet. See [status](docs/choir/STATUS.md) and [agent contract](AGENTS.md). Original documentation and licenses follow.
+> **Dolce Choir test branch**: adds SATB jianpu + staff groups, isolated piano MP3/MIDI exports, lightweight mobile practice and a real local sharing service. Singing feedback remains experimental; production cloud configuration and physical-phone acceptance are pending, so this is not a completed v1 release. See [local setup/deployment](docs/choir/RUNNING.md), [status](docs/choir/STATUS.md), [device acceptance](docs/choir/DEVICE-ACCEPTANCE.md) and [agent contract](AGENTS.md). Run this fork locally to use choir features; online/download links below belong to the upstream version. Original documentation and licenses follow.
 
 # Dolce
 

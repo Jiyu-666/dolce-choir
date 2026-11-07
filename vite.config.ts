@@ -2,6 +2,8 @@ import { defineConfig, type Plugin } from "vite";
 import { copyFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { checkPublicConfig } from "./scripts/choir-build-config.mjs";
 import { en } from "./src/i18n/en";
 
 // @ts-expect-error import.meta.dirname 在 Vite 的 ESM 配置里可用（node ≥20 亦有）
@@ -60,6 +62,22 @@ function emitEnPage(): Plugin {
 // 构建期注入成 __APP_VERSION__ 供「关于」页与更新检查用——别在前端再抄一份常量。
 const pkgVersion = JSON.parse(readFileSync(`${here}/package.json`, "utf-8")).version as string;
 
+function choirBuildInfo(): Plugin {
+  let basePath = "/";
+  return {
+    name: "choir-build-info",
+    configResolved(c) { checkPublicConfig(c.env); basePath = c.base; },
+    generateBundle() {
+      let commit = "unknown", dirty = true;
+      try {
+        commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: here, encoding: "utf8" }).trim();
+        dirty = !!execFileSync("git", ["status", "--porcelain"], { cwd: here, encoding: "utf8" }).trim();
+      } catch { /* Source archives have no git metadata. */ }
+      this.emitFile({ type: "asset", fileName: "build-info.json", source: JSON.stringify({ version: pkgVersion, commit, dirty, basePath }) });
+    },
+  };
+}
+
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
@@ -71,7 +89,7 @@ const base = process.env.BASE_PATH || "/";
 // https://vite.dev/config/
 export default defineConfig(async () => ({
   base,
-  plugins: [copyPdfjsWasm(), emitEnPage()],
+  plugins: [copyPdfjsWasm(), emitEnPage(), choirBuildInfo()],
   define: { __APP_VERSION__: JSON.stringify(pkgVersion) },
   // 程序产出一律放 out/（构建、脚本报告、缓存），web 根下不再散落输出目录
   build: { outDir: "out/dist", emptyOutDir: true },
